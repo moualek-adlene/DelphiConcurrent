@@ -3,7 +3,8 @@ program DelphiConcurrentTest;
 uses
   FMX.Forms,
   MainUnit in 'MainUnit.pas' {Form1},
-  DelphiConcurrent in 'DelphiConcurrent.pas';
+  DelphiConcurrent in 'DelphiConcurrent.pas',
+  ThreadsUnit in 'ThreadsUnit.pas';
 
 {$R *.res}
 

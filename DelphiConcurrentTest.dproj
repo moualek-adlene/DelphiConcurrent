@@ -198,6 +198,7 @@
             <FormType>fmx</FormType>
         </DCCReference>
         <DCCReference Include="DelphiConcurrent.pas"/>
+        <DCCReference Include="ThreadsUnit.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -246,7 +247,14 @@
                     <Source Name="MainSource">DelphiConcurrentTest.dpr</Source>
                 </Source>
             </Delphi.Personality>
-            <Deployment/>
+            <Deployment Version="3">
+                <DeployFile LocalName="Win32\Debug\DelphiConcurrentTest.exe" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>DelphiConcurrentTest.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+            </Deployment>
             <Platforms>
                 <Platform value="Android">False</Platform>
                 <Platform value="OSX32">False</Platform>
