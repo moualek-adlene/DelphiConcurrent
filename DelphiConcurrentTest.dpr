@@ -2,7 +2,7 @@ program DelphiConcurrentTest;
 
 uses
   FMX.Forms,
-  MainUnit in 'MainUnit.pas' {Form1},
+  MainUnit in 'MainUnit.pas' {MainForm},
   DelphiConcurrent in 'DelphiConcurrent.pas',
   ThreadsUnit in 'ThreadsUnit.pas';
 
@@ -10,6 +10,6 @@ uses
 
 begin
   Application.Initialize;
-  Application.CreateForm(TForm1, Form1);
+  Application.CreateForm(TMainForm, MainForm);
   Application.Run;
 end.

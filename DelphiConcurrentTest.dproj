@@ -194,7 +194,7 @@
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
         <DCCReference Include="MainUnit.pas">
-            <Form>Form1</Form>
+            <Form>MainForm</Form>
             <FormType>fmx</FormType>
         </DCCReference>
         <DCCReference Include="DelphiConcurrent.pas"/>

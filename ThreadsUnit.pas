@@ -6,11 +6,6 @@ uses
   System.Classes, System.Types, System.SyncObjs, System.SysUtils, System.Contnrs, System.Generics.Collections,
   DelphiConcurrent;
 
-const
-  ProducersNbr = 20;
-  ConsumersNbr = 200;
-  MessagesNbrPerProducer = 100;
-
 type
   TExchangedMessage = class
     FID: Integer;
@@ -24,10 +19,10 @@ type
 
   TProducer = class(TThread)
   private
-    FThreadNum: Integer;
+    FThreadNum, FMessagesNbr: Integer; // here FMessagesNbr = Nbr of messages to produce
     FSharedRessource: TDCAdlThreaded;
   public
-    constructor Create(const AThreadNum: Integer; ASharedRessource: TDCAdlThreaded);
+    constructor Create(const AThreadNum, AMessagesNbr: Integer; ASharedRessource: TDCAdlThreaded);
     procedure Execute; override;
     procedure NotifyToUI(const msg: String);
     property ThreadNum: Integer read FThreadNum write FThreadNum;
@@ -35,11 +30,11 @@ type
 
   TConsumer = class(TThread)
   private
-    FThreadNum: Integer;
+    FThreadNum, FMessagesNbr: Integer; // here FMessagesNbr = Nbr of messages to consume
     FSharedRessource: TDCAdlThreaded;
     FReceivedMessagesCopies: TObjectList<TExchangedMessage>;
   public
-    constructor Create(const AThreadNum: Integer; ASharedRessource: TDCAdlThreaded);
+    constructor Create(const AThreadNum, AMessagesNbr: Integer; ASharedRessource: TDCAdlThreaded);
     destructor Destroy; override;
     procedure Execute; override;
     procedure NotifyToUI(const msg: String);
@@ -53,10 +48,11 @@ uses
 
 { TProducer }
 
-constructor TProducer.Create(const AThreadNum: Integer; ASharedRessource: TDCAdlThreaded);
+constructor TProducer.Create(const AThreadNum, AMessagesNbr: Integer; ASharedRessource: TDCAdlThreaded);
 begin
   inherited Create();
   FThreadNum := AThreadNum;
+  FMessagesNbr := AMessagesNbr;
   FSharedRessource := ASharedRessource;
 end;
 
@@ -69,7 +65,7 @@ begin
   inherited;
   NotifyToUI(Format('Producer Thread n°%d Started', [FThreadNum]));
   i:=1;
-  while (i <= MessagesNbrPerProducer) and (not Terminated) do
+  while (i <= FMessagesNbr) and (not Terminated) do
   begin
     LExchangedMessage := TExchangedMessage.Create(i, Now());
     LRessourcePointer := FSharedRessource.Lock(False); // ReadOnly: Boolean=True
@@ -90,16 +86,17 @@ end;
 procedure TProducer.NotifyToUI(const msg: String);
 begin
   TThread.Queue(nil, procedure begin
-    Form1.UpdateTestResult(msg);
+    MainForm.UpdateTestResult(msg);
   end);
 end;
 
 { TConsumer }
 
-constructor TConsumer.Create(const AThreadNum: Integer; ASharedRessource: TDCAdlThreaded);
+constructor TConsumer.Create(const AThreadNum, AMessagesNbr: Integer; ASharedRessource: TDCAdlThreaded);
 begin
   inherited Create();
   FThreadNum := AThreadNum;
+  FMessagesNbr := AMessagesNbr;
   FSharedRessource := ASharedRessource;
   FReceivedMessagesCopies := TObjectList<TExchangedMessage>.Create(True);
 end;
@@ -118,7 +115,7 @@ var
 begin
   inherited;
   NotifyToUI(Format('Consumer Thread n°%d Started', [FThreadNum]));
-  while (FReceivedMessagesCopies.Count < MessagesNbrPerProducer * ProducersNbr) and (not Terminated) do
+  while (FReceivedMessagesCopies.Count < FMessagesNbr) and (not Terminated) do
   begin
     LRessourcePointer := FSharedRessource.Lock(); // ReadOnly: Boolean=True
     try
@@ -145,7 +142,7 @@ end;
 procedure TConsumer.NotifyToUI(const msg: String);
 begin
   TThread.Queue(nil, procedure begin
-    Form1.UpdateTestResult(msg);
+    MainForm.UpdateTestResult(msg);
   end);
 end;
 
