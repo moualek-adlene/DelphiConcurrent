@@ -1,0 +1,760 @@
+unit DelphiConcurrent;
+
+// Delphi Concurrent Anti-DeadLock Optimistic-MultiRead FrameWork
+// Author : Moualek Adlene (moualek.adlene@gmail.com)
+// Version : 0.2
+// Project Start Date : 25/02/2018
+
+interface
+
+uses
+  System.Classes, System.Types, System.SyncObjs, System.SysUtils, System.Contnrs,
+  System.Generics.Defaults, System.Generics.Collections;
+
+type
+  TDCProtected = class;
+  TDCProtectedClass = class of TDCProtected;
+  TDCException = class(Exception);
+  TDCDeadLockException = class(TDCException);
+  TDCRemainingLocksException = class(TDCException);
+  TDCBadUnlockSequenceException = class(TDCException);
+  TDCRWLockNeededException = class(TDCException);
+  TDCLockType = (ltMREW, ltCriticalSection, ltMonitor);
+
+  // Delphi Concurrent Multi-Read Exclusive-Write Synchronizer Class
+  TDCMultiReadExclusiveWriteSynchronizer = class(TMultiReadExclusiveWriteSynchronizer)
+  private
+    FReadOnly: Boolean;
+  public
+    constructor Create();
+    procedure Lock(AReadOnly: Boolean); inline;
+    procedure Unlock; inline;
+    property ReadOnly: Boolean read FReadOnly;
+  end;
+
+  // Delphi Anti-DeadLock Local-Execution-Context Class
+  TDCAdlLocalExecContext = class
+  private
+    FGUIDsStack: TStack<Integer>;
+    function GetCurrentGUID(): Integer; inline;
+  public
+    class function GetNextGUID(): Integer;
+    constructor Create();
+    destructor Destroy; override;
+    procedure PushGUID(const AGUID: Integer); inline;
+    function PopGUID: Integer; inline;
+    property CurrentGUID: Integer read GetCurrentGUID;
+  end;
+
+  // Delphi Concurrent Anti-DeadLock Optimistic-Multi-Read Generic Class
+  TDCThreaded = class
+  private
+    FLockType: TDCLockType;
+    FLockObject: TObject;
+    FSharedObject: TDCProtected;
+  public
+    constructor Create(ADCProtectedClass: TDCProtectedClass; ALockType: TDCLockType=ltMREW);
+    destructor Destroy; override;
+    // Be optimist for Multi-Read, Use Read-Write Mode (Exclusif Access) only when necessary
+    function Lock(AExecContext: TDCAdlLocalExecContext; AReadOnly: Boolean=True): TDCProtected; inline;
+    procedure Unlock(AExecContext: TDCAdlLocalExecContext); inline;
+    property LockType: TDCLockType read FLockType;
+    property LockObject: TObject read FLockObject;
+  end;
+
+  // Delphi Basic Protected-Object Class
+  TDCProtected = class
+  private
+    FMTProtector: TDCThreaded;
+    FObjectID: Integer;
+    procedure CheckReadWriteMode(); inline;
+  public
+    constructor Create(AMTProtector: TDCThreaded); virtual;
+    property MTProtector: TDCThreaded read FMTProtector;
+    property ObjectID: Integer read FObjectID;
+  end;
+
+  // A Thread-Safe TList Class
+  TDCProtectedList = class(TDCProtected)
+  private
+    FList: TList;
+  protected
+    function Get(Index: Integer): Pointer;
+    procedure Put(Index: Integer; Item: Pointer);
+    function GetCapacity(): Integer;
+    function GetCount(): Integer;
+    procedure SetCapacity(NewCapacity: Integer);
+    procedure SetCount(NewCount: Integer);
+  public
+    constructor Create(AMTProtector: TDCThreaded); override;
+    destructor Destroy; override;
+    function Add(Item: Pointer): Integer;
+    procedure Clear; virtual;
+    procedure Delete(Index: Integer);
+    procedure Exchange(Index1, Index2: Integer);
+    function Expand: TList;
+    function Extract(Item: Pointer): Pointer;
+    function ExtractItem(Item: Pointer; Direction: TDirection): Pointer;
+    function First: Pointer; inline;
+    function GetEnumerator: TListEnumerator;
+    function IndexOf(Item: Pointer): Integer;
+    function IndexOfItem(Item: Pointer; Direction: TDirection): Integer;
+    procedure Insert(Index: Integer; Item: Pointer);
+    function Last: Pointer;
+    procedure Move(CurIndex, NewIndex: Integer);
+    function Remove(Item: Pointer): Integer;
+    function RemoveItem(Item: Pointer; Direction: TDirection): Integer;
+    procedure Pack;
+    procedure Sort(Compare: TListSortCompare);
+    procedure SortList(const Compare: TListSortCompareFunc);
+    procedure Assign(ListA: TList; AOperator: TListAssignOp = laCopy; ListB: TList = nil);
+    property Capacity: Integer read GetCapacity write SetCapacity;
+    property Count: Integer read GetCount write SetCount;
+    property Items[Index: Integer]: Pointer read Get write Put; default;
+  end;
+
+  // A Thread-Safe TObjectList Class
+  TDCProtectedObjectList = class(TDCProtected)
+  private
+    FObjectList: TObjectList;
+  protected
+    function GetOwnsObjects(): Boolean;
+    procedure SetOwnsObjects(Value: Boolean);
+    function GetItem(Index: Integer): TObject; inline;
+    procedure SetItem(Index: Integer; AObject: TObject);
+  public
+    constructor Create(AMTProtector: TDCThreaded; AOwnsObjects: Boolean); reintroduce;
+    destructor Destroy; override;
+    function Add(AObject: TObject): Integer;
+    function Extract(Item: TObject): TObject;
+    function ExtractItem(Item: TObject; Direction: TList.TDirection): TObject;
+    function Remove(AObject: TObject): Integer; overload;
+    function RemoveItem(AObject: TObject; ADirection: TList.TDirection): Integer;
+    function IndexOf(AObject: TObject): Integer; inline;
+    function IndexOfItem(AObject: TObject; ADirection: TList.TDirection): Integer; inline;
+    function FindInstanceOf(AClass: TClass; AExact: Boolean = True; AStartAt: Integer = 0): Integer;
+    procedure Insert(Index: Integer; AObject: TObject);
+    function First: TObject; inline;
+    function Last: TObject; inline;
+    property OwnsObjects: Boolean read GetOwnsObjects write SetOwnsObjects;
+    property Items[Index: Integer]: TObject read GetItem write SetItem; default;
+  end;
+
+  // A Thread-Safe TStack Class
+  TDCProtectedStack = class(TDCProtected)
+  private
+    FStack: TStack;
+  public
+    constructor Create(AMTProtector: TDCThreaded); override;
+    destructor Destroy; override;
+    function Count: Integer;
+    function AtLeast(ACount: Integer): Boolean;
+    function Push(AItem: Pointer): Pointer;
+    function Pop: Pointer;
+    function Peek: Pointer;
+  end;
+
+  // A Thread-Safe TObjectStack Class
+  TDCProtectedObjectStack = class(TDCProtected)
+  private
+    FObjectStack: TObjectStack;
+  public
+    constructor Create(AMTProtector: TDCThreaded); override;
+    destructor Destroy; override;
+    function Count: Integer;
+    function AtLeast(ACount: Integer): Boolean;
+    function Push(AObject: TObject): TObject;
+    function Pop: TObject;
+    function Peek: TObject;
+  end;
+
+  // A Thread-Safe TQueue Class
+  TDCProtectedQueue = class(TDCProtected)
+  private
+    FQueue: TQueue;
+  public
+    constructor Create(AMTProtector: TDCThreaded); override;
+    destructor Destroy; override;
+    function Count: Integer;
+    function AtLeast(ACount: Integer): Boolean;
+    function Push(AItem: Pointer): Pointer;
+    function Pop: Pointer;
+    function Peek: Pointer;
+  end;
+
+  // A Thread-Safe TObjectQueue Class
+  TDCProtectedObjectQueue = class(TDCProtected)
+  private
+    FObjectQueue: TObjectQueue;
+  public
+    constructor Create(AMTProtector: TDCThreaded); override;
+    destructor Destroy; override;
+    function Count: Integer;
+    function AtLeast(ACount: Integer): Boolean;
+    function Push(AObject: TObject): TObject;
+    function Pop: TObject;
+    function Peek: TObject;
+  end;
+
+implementation
+
+var NextSharedObjectGUID: Integer = 0;
+
+{ TDCMultiReadExclusiveWriteSynchronizer }
+
+constructor TDCMultiReadExclusiveWriteSynchronizer.Create;
+begin
+  inherited Create;
+  FReadOnly := False;
+end;
+
+procedure TDCMultiReadExclusiveWriteSynchronizer.Lock(AReadOnly: Boolean);
+begin
+  if AReadOnly
+    then BeginRead
+    else BeginWrite;
+  FReadOnly := AReadOnly;
+end;
+
+procedure TDCMultiReadExclusiveWriteSynchronizer.Unlock;
+begin
+  if FReadOnly
+    then EndRead
+    else EndWrite;
+end;
+
+{ TDCAdlLocalExecContext }
+
+constructor TDCAdlLocalExecContext.Create;
+begin
+  inherited Create;
+  FGUIDsStack := TStack<Integer>.Create;
+end;
+
+destructor TDCAdlLocalExecContext.Destroy;
+begin
+  if (FGUIDsStack.Count > 0) then
+  begin
+    raise TDCRemainingLocksException.Create(Format('The stack is not empty in the local execution context (%d remaining locks).', [FGUIDsStack.Count]));
+  end;
+  FreeAndNil(FGUIDsStack);
+  inherited Destroy;
+end;
+
+function TDCAdlLocalExecContext.GetCurrentGUID: Integer;
+begin
+  if (FGUIDsStack.Count > 0)
+    then Result := Integer(FGUIDsStack.Peek)
+    else Result := 0;
+end;
+
+class function TDCAdlLocalExecContext.GetNextGUID: Integer;
+begin
+  Result := TInterlocked.Increment(NextSharedObjectGUID);
+end;
+
+function TDCAdlLocalExecContext.PopGUID: Integer;
+begin
+  Result := Integer(FGUIDsStack.Pop);
+end;
+
+procedure TDCAdlLocalExecContext.PushGUID(const AGUID: Integer);
+begin
+  FGUIDsStack.Push(AGUID);
+end;
+
+{ TDCThreaded }
+
+constructor TDCThreaded.Create(ADCProtectedClass: TDCProtectedClass; ALockType: TDCLockType);
+begin
+  inherited Create;
+  FLockType := ALockType;
+  case FLockType of
+    ltMREW: FLockObject := TDCMultiReadExclusiveWriteSynchronizer.Create;
+    ltCriticalSection: FLockObject := TCriticalSection.Create;
+    ltMonitor: FLockObject := nil;
+  end;
+  FSharedObject := ADCProtectedClass.Create(Self);
+end;
+
+destructor TDCThreaded.Destroy;
+begin
+  try
+    FreeAndNil(FSharedObject);
+    inherited Destroy;
+  finally
+    FreeAndNil(FLockObject);
+  end;
+end;
+
+function TDCThreaded.Lock(AExecContext: TDCAdlLocalExecContext; AReadOnly: Boolean): TDCProtected;
+begin
+  if (FSharedObject.ObjectID < AExecContext.CurrentGUID) then
+  begin
+    raise TDCDeadLockException.Create('Possible deadLock detected. The global lock order is not respected.');
+  end;
+  case FLockType of
+    ltMREW: TDCMultiReadExclusiveWriteSynchronizer(FLockObject).Lock(AReadOnly);
+    ltCriticalSection: TCriticalSection(FLockObject).Acquire;
+    ltMonitor: TMonitor.Enter(FSharedObject);
+  end;
+  AExecContext.PushGUID(FSharedObject.ObjectID);
+  Result := FSharedObject;
+end;
+
+procedure TDCThreaded.Unlock(AExecContext: TDCAdlLocalExecContext);
+begin
+  if (FSharedObject.ObjectID <> AExecContext.CurrentGUID) then
+  begin
+    raise TDCBadUnlockSequenceException.Create('Bad unlock sequence. The local unlock order must be the reverse of the local lock order');
+  end;
+  AExecContext.PopGUID();
+  case FLockType of
+    ltMREW: TDCMultiReadExclusiveWriteSynchronizer(FLockObject).Unlock;
+    ltCriticalSection: TCriticalSection(FLockObject).Release;
+    ltMonitor: TMonitor.Exit(FSharedObject);
+  end;
+end;
+
+{ TDCProtected }
+
+constructor TDCProtected.Create(AMTProtector: TDCThreaded);
+begin
+  inherited Create;
+  FMTProtector := AMTProtector;
+  FObjectID := TDCAdlLocalExecContext.GetNextGUID();
+end;
+
+procedure TDCProtected.CheckReadWriteMode();
+begin
+  if (FMTProtector.LockType = ltMREW) and (TDCMultiReadExclusiveWriteSynchronizer(FMTProtector.LockObject).ReadOnly) then
+  begin
+    raise TDCRWLockNeededException.Create('Read/Write lock is needed for this operation.');
+  end;
+end;
+
+{ TDCProtectedList }
+
+function TDCProtectedList.Add(Item: Pointer): Integer;
+begin
+  CheckReadWriteMode();
+  Result := FList.Add(Item);
+end;
+
+procedure TDCProtectedList.Assign(ListA: TList; AOperator: TListAssignOp; ListB: TList);
+begin
+  CheckReadWriteMode();
+  FList.Assign(ListA, AOperator, ListB);
+end;
+
+procedure TDCProtectedList.Clear();
+begin
+  CheckReadWriteMode();
+  FList.Clear;
+end;
+
+constructor TDCProtectedList.Create(AMTProtector: TDCThreaded);
+begin
+  inherited Create(AMTProtector);
+  FList := TList.Create;
+end;
+
+procedure TDCProtectedList.Delete(Index: Integer);
+begin
+  CheckReadWriteMode();
+  FList.Delete(Index);
+end;
+
+destructor TDCProtectedList.Destroy;
+begin
+  FreeAndNil(FList);
+  inherited Destroy;
+end;
+
+procedure TDCProtectedList.Exchange(Index1, Index2: Integer);
+begin
+  CheckReadWriteMode();
+  FList.Exchange(Index1, Index2);
+end;
+
+function TDCProtectedList.Expand(): TList;
+begin
+  CheckReadWriteMode();
+  Result := FList.Expand();
+end;
+
+function TDCProtectedList.Extract(Item: Pointer): Pointer;
+begin
+  CheckReadWriteMode();
+  Result := FList.Extract(Item);
+end;
+
+function TDCProtectedList.ExtractItem(Item: Pointer; Direction: TDirection): Pointer;
+begin
+  CheckReadWriteMode();
+  Result := FList.ExtractItem(Item, Direction);
+end;
+
+function TDCProtectedList.First: Pointer;
+begin
+  Result := FList.First();
+end;
+
+function TDCProtectedList.Get(Index: Integer): Pointer;
+begin
+  Result := FList.Items[Index];
+end;
+
+function TDCProtectedList.GetCapacity: Integer;
+begin
+  Result := FList.Capacity;
+end;
+
+function TDCProtectedList.GetCount: Integer;
+begin
+  Result := FList.Count;
+end;
+
+function TDCProtectedList.GetEnumerator: TListEnumerator;
+begin
+  Result := FList.GetEnumerator();
+end;
+
+function TDCProtectedList.IndexOf(Item: Pointer): Integer;
+begin
+  Result := FList.IndexOf(Item);
+end;
+
+function TDCProtectedList.IndexOfItem(Item: Pointer; Direction: TDirection): Integer;
+begin
+  Result := FList.IndexOfItem(Item, Direction);
+end;
+
+procedure TDCProtectedList.Insert(Index: Integer; Item: Pointer);
+begin
+  CheckReadWriteMode();
+  FList.Insert(Index, Item);
+end;
+
+function TDCProtectedList.Last: Pointer;
+begin
+  Result := FList.Last();
+end;
+
+procedure TDCProtectedList.Move(CurIndex, NewIndex: Integer);
+begin
+  CheckReadWriteMode();
+  FList.Move(CurIndex, NewIndex);
+end;
+
+procedure TDCProtectedList.Pack;
+begin
+  CheckReadWriteMode();
+  FList.Pack();
+end;
+
+procedure TDCProtectedList.Put(Index: Integer; Item: Pointer);
+begin
+  CheckReadWriteMode();
+  FList.Items[Index] := Item;
+end;
+
+function TDCProtectedList.Remove(Item: Pointer): Integer;
+begin
+  CheckReadWriteMode();
+  Result := FList.Remove(Item);
+end;
+
+function TDCProtectedList.RemoveItem(Item: Pointer; Direction: TDirection): Integer;
+begin
+  CheckReadWriteMode();
+  Result := FList.RemoveItem(Item, Direction);
+end;
+
+procedure TDCProtectedList.SetCapacity(NewCapacity: Integer);
+begin
+  CheckReadWriteMode();
+  FList.Capacity := NewCapacity;
+end;
+
+procedure TDCProtectedList.SetCount(NewCount: Integer);
+begin
+  CheckReadWriteMode();
+  FList.Count := NewCount;
+end;
+
+procedure TDCProtectedList.Sort(Compare: TListSortCompare);
+begin
+  CheckReadWriteMode();
+  FList.Sort(Compare);
+end;
+
+procedure TDCProtectedList.SortList(const Compare: TListSortCompareFunc);
+begin
+  CheckReadWriteMode();
+  FList.SortList(Compare);
+end;
+
+{ TDCProtectedObjectList }
+
+function TDCProtectedObjectList.Add(AObject: TObject): Integer;
+begin
+  CheckReadWriteMode();
+  Result := FObjectList.Add(AObject);
+end;
+
+constructor TDCProtectedObjectList.Create(AMTProtector: TDCThreaded; AOwnsObjects: Boolean);
+begin
+  inherited Create(AMTProtector);
+  FObjectList := TObjectList.Create(AOwnsObjects);
+end;
+
+destructor TDCProtectedObjectList.Destroy;
+begin
+  FreeAndNil(FObjectList);
+  inherited Destroy;
+end;
+
+function TDCProtectedObjectList.Extract(Item: TObject): TObject;
+begin
+  CheckReadWriteMode();
+  Result := FObjectList.Extract(Item);
+end;
+
+function TDCProtectedObjectList.ExtractItem(Item: TObject; Direction: TList.TDirection): TObject;
+begin
+  CheckReadWriteMode();
+  Result := FObjectList.ExtractItem(Item, Direction);
+end;
+
+function TDCProtectedObjectList.FindInstanceOf(AClass: TClass; AExact: Boolean; AStartAt: Integer): Integer;
+begin
+  Result := FObjectList.FindInstanceOf(AClass, AExact, AStartAt);
+end;
+
+function TDCProtectedObjectList.First: TObject;
+begin
+  Result := FObjectList.First;
+end;
+
+function TDCProtectedObjectList.GetItem(Index: Integer): TObject;
+begin
+  Result := FObjectList.Items[Index];
+end;
+
+function TDCProtectedObjectList.GetOwnsObjects: Boolean;
+begin
+  Result := FObjectList.OwnsObjects;
+end;
+
+function TDCProtectedObjectList.IndexOf(AObject: TObject): Integer;
+begin
+  Result := FObjectList.IndexOf(AObject);
+end;
+
+function TDCProtectedObjectList.IndexOfItem(AObject: TObject; ADirection: TList.TDirection): Integer;
+begin
+  Result := FObjectList.IndexOfItem(AObject, ADirection);
+end;
+
+procedure TDCProtectedObjectList.Insert(Index: Integer; AObject: TObject);
+begin
+  CheckReadWriteMode();
+  FObjectList.Insert(Index, AObject);
+end;
+
+function TDCProtectedObjectList.Last: TObject;
+begin
+  Result := FObjectList.Last;
+end;
+
+function TDCProtectedObjectList.Remove(AObject: TObject): Integer;
+begin
+  CheckReadWriteMode();
+  Result := FObjectList.Remove(AObject);
+end;
+
+function TDCProtectedObjectList.RemoveItem(AObject: TObject; ADirection: TList.TDirection): Integer;
+begin
+  CheckReadWriteMode();
+  Result := FObjectList.RemoveItem(AObject, ADirection);
+end;
+
+procedure TDCProtectedObjectList.SetItem(Index: Integer; AObject: TObject);
+begin
+  CheckReadWriteMode();
+  FObjectList.Items[Index] := AObject;
+end;
+
+procedure TDCProtectedObjectList.SetOwnsObjects(Value: Boolean);
+begin
+  CheckReadWriteMode();
+  FObjectList.OwnsObjects := Value;
+end;
+
+{ TDCProtectedStack }
+
+function TDCProtectedStack.AtLeast(ACount: Integer): Boolean;
+begin
+  Result := FStack.AtLeast(ACount);
+end;
+
+function TDCProtectedStack.Count: Integer;
+begin
+  Result := FStack.Count;
+end;
+
+constructor TDCProtectedStack.Create(AMTProtector: TDCThreaded);
+begin
+  inherited Create(AMTProtector);
+  FStack := TStack.Create;
+end;
+
+destructor TDCProtectedStack.Destroy;
+begin
+  FreeAndNil(FStack);
+  inherited Destroy;
+end;
+
+function TDCProtectedStack.Peek: Pointer;
+begin
+  Result := FStack.Peek();
+end;
+
+function TDCProtectedStack.Pop: Pointer;
+begin
+  CheckReadWriteMode();
+  Result := FStack.Pop();
+end;
+
+function TDCProtectedStack.Push(AItem: Pointer): Pointer;
+begin
+  CheckReadWriteMode();
+  Result := FStack.Push(AItem);
+end;
+
+{ TDCProtectedObjectStack }
+
+function TDCProtectedObjectStack.AtLeast(ACount: Integer): Boolean;
+begin
+  Result := FObjectStack.AtLeast(ACount);
+end;
+
+function TDCProtectedObjectStack.Count: Integer;
+begin
+  Result := FObjectStack.Count;
+end;
+
+constructor TDCProtectedObjectStack.Create(AMTProtector: TDCThreaded);
+begin
+  inherited Create(AMTProtector);
+  FObjectStack := TObjectStack.Create;
+end;
+
+destructor TDCProtectedObjectStack.Destroy;
+begin
+  FreeAndNil(FObjectStack);
+  inherited Destroy;
+end;
+
+function TDCProtectedObjectStack.Peek: TObject;
+begin
+  Result := FObjectStack.Peek();
+end;
+
+function TDCProtectedObjectStack.Pop: TObject;
+begin
+  CheckReadWriteMode();
+  Result := FObjectStack.Pop();
+end;
+
+function TDCProtectedObjectStack.Push(AObject: TObject): TObject;
+begin
+  CheckReadWriteMode();
+  Result := FObjectStack.Push(AObject);
+end;
+
+{ TDCProtectedQueue }
+
+function TDCProtectedQueue.AtLeast(ACount: Integer): Boolean;
+begin
+  Result := FQueue.AtLeast(ACount);
+end;
+
+function TDCProtectedQueue.Count: Integer;
+begin
+  Result := FQueue.Count;
+end;
+
+constructor TDCProtectedQueue.Create(AMTProtector: TDCThreaded);
+begin
+  inherited Create(AMTProtector);
+  FQueue := TQueue.Create;
+end;
+
+destructor TDCProtectedQueue.Destroy;
+begin
+  FreeAndNil(FQueue);
+  inherited Destroy;
+end;
+
+function TDCProtectedQueue.Peek: Pointer;
+begin
+  Result := FQueue.Peek();
+end;
+
+function TDCProtectedQueue.Pop: Pointer;
+begin
+  CheckReadWriteMode();
+  Result := FQueue.Pop();
+end;
+
+function TDCProtectedQueue.Push(AItem: Pointer): Pointer;
+begin
+  CheckReadWriteMode();
+  Result := FQueue.Push(AItem);
+end;
+
+{ TDCProtectedObjectQueue }
+
+function TDCProtectedObjectQueue.AtLeast(ACount: Integer): Boolean;
+begin
+  Result := FObjectQueue.AtLeast(ACount);
+end;
+
+function TDCProtectedObjectQueue.Count: Integer;
+begin
+  Result := FObjectQueue.Count;
+end;
+
+constructor TDCProtectedObjectQueue.Create(AMTProtector: TDCThreaded);
+begin
+  inherited Create(AMTProtector);
+  FObjectQueue := TObjectQueue.Create;
+end;
+
+destructor TDCProtectedObjectQueue.Destroy;
+begin
+  FreeAndNil(FObjectQueue);
+  inherited Destroy;
+end;
+
+function TDCProtectedObjectQueue.Peek: TObject;
+begin
+  Result := FObjectQueue.Peek();
+end;
+
+function TDCProtectedObjectQueue.Pop: TObject;
+begin
+  CheckReadWriteMode();
+  Result := FObjectQueue.Pop();
+end;
+
+function TDCProtectedObjectQueue.Push(AObject: TObject): TObject;
+begin
+  CheckReadWriteMode();
+  Result := FObjectQueue.Push(AObject);
+end;
+
+end.
+
