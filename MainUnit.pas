@@ -222,11 +222,8 @@ begin
       then MessagesLockType := ltCriticalSection
     else
       MessagesLockType := ltMonitor;
-    // we want to simulate a deadlock but we dont want to have a real deadlock in this simulator
-    // because we can not skip out from a real deadlock and restart a new test without killing the application
-    // so the TDCThreaded has a special option made for this test case (the 'SimulationMode' option)
     for i:=1 to 3 do
-      SharedResourcesLst[i] := TDCThreaded.Create(TDCProtectedList, MessagesLockType, True); // SimulationMode = True
+      SharedResourcesLst[i] := TDCThreaded.Create(TDCProtectedList, MessagesLockType);
     //
     DeadLock_Test_Thread_A := TDeadLockTester.Create('A', SharedResourcesLst, Scenario_A_ListBox.Items);
     DeadLock_Test_Thread_B := TDeadLockTester.Create('B', SharedResourcesLst, Scenario_B_ListBox.Items);

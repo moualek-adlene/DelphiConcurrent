@@ -248,10 +248,23 @@ begin
     end;
   finally
     try
+      while (LExecContext.CurrentLockOrder > 0) do
+      begin
+        for i:=0 to High(FSharedResources) do
+        begin
+          if (FSharedResources[i].LockOrder = LExecContext.CurrentLockOrder) then
+          begin
+            FSharedResources[i].UnLock(LExecContext);
+            Break;
+          end;
+        end;
+      end;
       FreeAndNil(LExecContext);
     except
-      on e:Exception
-        do NotifyToUI('Exception "' + e.ClassName + '" on Thread ' + FThreadNum + ' : ' + e.message);
+      on e:Exception do
+      begin
+        NotifyToUI('Exception "' + e.ClassName + '" on Thread ' + FThreadNum + ' : ' + e.message);
+      end;
     end;
   end;
   NotifyToUI('DeadLockTester Thread ' + FThreadNum + ' Terminated');

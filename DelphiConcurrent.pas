@@ -2,8 +2,9 @@ unit DelphiConcurrent;
 
 // Delphi Concurrent Anti-DeadLock Optimistic-MultiRead FrameWork
 // Author : Moualek Adlene (moualek.adlene@gmail.com)
-// Version : 0.2
+// Version : 0.3
 // Project Start Date : 25/02/2018
+// Project URL : https://github.com/moualek-adlene/DelphiConcurrent
 
 interface
 
@@ -35,15 +36,15 @@ type
   // Delphi Anti-DeadLock Local-Execution-Context Class
   TDCAdlLocalExecContext = class
   private
-    FGUIDsStack: TStack<Integer>;
-    function GetCurrentGUID(): Integer; inline;
+    FLockOrdersStack: TStack<Integer>;
+    function GetCurrentLockOrder(): Integer; inline;
   public
-    class function GetNextGUID(): Integer;
+    class function GetNextLockOrder(): Integer;
     constructor Create();
     destructor Destroy; override;
-    procedure PushGUID(const AGUID: Integer); inline;
-    function PopGUID: Integer; inline;
-    property CurrentGUID: Integer read GetCurrentGUID;
+    procedure PushLockOrder(const ALockOrder: Integer); inline;
+    function PopLockOrder: Integer; inline;
+    property CurrentLockOrder: Integer read GetCurrentLockOrder;
   end;
 
   // Delphi Concurrent Anti-DeadLock Optimistic-Multi-Read Generic Class
@@ -52,28 +53,26 @@ type
     FLockObject: TObject;
     FSharedObject: TDCProtected;
     FLockType: TDCLockType;
-    FSimulationMode: Boolean;
+    FLockOrder: Integer;
   public
-    constructor Create(ADCProtectedClass: TDCProtectedClass; ALockType: TDCLockType=ltMREW; ASimulationMode: Boolean=False);
+    constructor Create(ADCProtectedClass: TDCProtectedClass; ALockType: TDCLockType=ltMREW);
     destructor Destroy; override;
     // Be optimist for Multi-Read, Use Read-Write Mode (Exclusif Access) only when necessary
     function Lock(AExecContext: TDCAdlLocalExecContext; AReadOnly: Boolean=True): TDCProtected; inline;
     procedure Unlock(AExecContext: TDCAdlLocalExecContext); inline;
     property LockObject: TObject read FLockObject;
     property LockType: TDCLockType read FLockType;
-    property SimulationMode: Boolean read FSimulationMode;
+    property LockOrder: Integer read FLockOrder;
   end;
 
   // Delphi Basic Protected-Object Class
   TDCProtected = class
   private
     FMTProtector: TDCThreaded;
-    FObjectID: Integer;
     procedure CheckReadWriteMode(); inline;
   public
     constructor Create(AMTProtector: TDCThreaded); virtual;
     property MTProtector: TDCThreaded read FMTProtector;
-    property ObjectID: Integer read FObjectID;
   end;
 
   // A Thread-Safe TList Class
@@ -200,7 +199,7 @@ type
 
 implementation
 
-var NextSharedObjectGUID: Integer = 0;
+var NextSharedObjectLockOrder: Integer = 0;
 
 { TDCMultiReadExclusiveWriteSynchronizer }
 
@@ -230,54 +229,54 @@ end;
 constructor TDCAdlLocalExecContext.Create;
 begin
   inherited Create;
-  FGUIDsStack := TStack<Integer>.Create;
+  FLockOrdersStack := TStack<Integer>.Create;
 end;
 
 destructor TDCAdlLocalExecContext.Destroy;
 begin
-  if (FGUIDsStack.Count > 0) then
+  if (FLockOrdersStack.Count > 0) then
   begin
-    raise TDCRemainingLocksException.Create(Format('The stack is not empty in the local execution context (%d remaining locks).', [FGUIDsStack.Count]));
+    raise TDCRemainingLocksException.Create(Format('The stack is not empty in the local execution context (%d remaining locks).', [FLockOrdersStack.Count]));
   end;
-  FreeAndNil(FGUIDsStack);
+  FreeAndNil(FLockOrdersStack);
   inherited Destroy;
 end;
 
-function TDCAdlLocalExecContext.GetCurrentGUID: Integer;
+function TDCAdlLocalExecContext.GetCurrentLockOrder: Integer;
 begin
-  if (FGUIDsStack.Count > 0)
-    then Result := Integer(FGUIDsStack.Peek)
+  if (FLockOrdersStack.Count > 0)
+    then Result := Integer(FLockOrdersStack.Peek)
     else Result := 0;
 end;
 
-class function TDCAdlLocalExecContext.GetNextGUID: Integer;
+class function TDCAdlLocalExecContext.GetNextLockOrder: Integer;
 begin
-  Result := TInterlocked.Increment(NextSharedObjectGUID);
+  Result := TInterlocked.Increment(NextSharedObjectLockOrder);
 end;
 
-function TDCAdlLocalExecContext.PopGUID: Integer;
+function TDCAdlLocalExecContext.PopLockOrder: Integer;
 begin
-  Result := Integer(FGUIDsStack.Pop);
+  Result := Integer(FLockOrdersStack.Pop);
 end;
 
-procedure TDCAdlLocalExecContext.PushGUID(const AGUID: Integer);
+procedure TDCAdlLocalExecContext.PushLockOrder(const ALockOrder: Integer);
 begin
-  FGUIDsStack.Push(AGUID);
+  FLockOrdersStack.Push(ALockOrder);
 end;
 
 { TDCThreaded }
 
-constructor TDCThreaded.Create(ADCProtectedClass: TDCProtectedClass; ALockType: TDCLockType; ASimulationMode: Boolean);
+constructor TDCThreaded.Create(ADCProtectedClass: TDCProtectedClass; ALockType: TDCLockType);
 begin
   inherited Create;
   FLockType := ALockType;
-  FSimulationMode := ASimulationMode;
   case FLockType of
     ltMREW: FLockObject := TDCMultiReadExclusiveWriteSynchronizer.Create;
     ltCriticalSection: FLockObject := TCriticalSection.Create;
     ltMonitor: FLockObject := nil;
   end;
   FSharedObject := ADCProtectedClass.Create(Self);
+  FLockOrder := TDCAdlLocalExecContext.GetNextLockOrder();
 end;
 
 destructor TDCThreaded.Destroy;
@@ -292,36 +291,30 @@ end;
 
 function TDCThreaded.Lock(AExecContext: TDCAdlLocalExecContext; AReadOnly: Boolean): TDCProtected;
 begin
-  if (FSharedObject.ObjectID < AExecContext.CurrentGUID) then
+  if (FLockOrder < AExecContext.CurrentLockOrder) then
   begin
     raise TDCDeadLockException.Create('Possible deadLock detected. The global lock order is not respected.');
   end;
-  if (not FSimulationMode) then
-  begin
-    case FLockType of
-      ltMREW: TDCMultiReadExclusiveWriteSynchronizer(FLockObject).Lock(AReadOnly);
-      ltCriticalSection: TCriticalSection(FLockObject).Acquire;
-      ltMonitor: TMonitor.Enter(FSharedObject);
-    end;
+  case FLockType of
+    ltMREW: TDCMultiReadExclusiveWriteSynchronizer(FLockObject).Lock(AReadOnly);
+    ltCriticalSection: TCriticalSection(FLockObject).Acquire;
+    ltMonitor: TMonitor.Enter(FSharedObject);
   end;
-  AExecContext.PushGUID(FSharedObject.ObjectID);
+  AExecContext.PushLockOrder(FLockOrder);
   Result := FSharedObject;
 end;
 
 procedure TDCThreaded.Unlock(AExecContext: TDCAdlLocalExecContext);
 begin
-  if (FSharedObject.ObjectID <> AExecContext.CurrentGUID) then
+  if (FLockOrder <> AExecContext.CurrentLockOrder) then
   begin
     raise TDCBadUnlockSequenceException.Create('Bad unlock sequence. The local unlock order must be the reverse of the local lock order');
   end;
-  AExecContext.PopGUID();
-  if (not FSimulationMode) then
-  begin
-    case FLockType of
-      ltMREW: TDCMultiReadExclusiveWriteSynchronizer(FLockObject).Unlock;
-      ltCriticalSection: TCriticalSection(FLockObject).Release;
-      ltMonitor: TMonitor.Exit(FSharedObject);
-    end;
+  AExecContext.PopLockOrder();
+  case FLockType of
+    ltMREW: TDCMultiReadExclusiveWriteSynchronizer(FLockObject).Unlock;
+    ltCriticalSection: TCriticalSection(FLockObject).Release;
+    ltMonitor: TMonitor.Exit(FSharedObject);
   end;
 end;
 
@@ -331,7 +324,6 @@ constructor TDCProtected.Create(AMTProtector: TDCThreaded);
 begin
   inherited Create;
   FMTProtector := AMTProtector;
-  FObjectID := TDCAdlLocalExecContext.GetNextGUID();
 end;
 
 procedure TDCProtected.CheckReadWriteMode();

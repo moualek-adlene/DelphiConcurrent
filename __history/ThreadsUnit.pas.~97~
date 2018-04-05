@@ -77,8 +77,8 @@ var
   LExecContext: TDCAdlLocalExecContext;
 begin
   inherited;
-  NameThreadForDebugging(Format('Producer n°%d', [FThreadNum]));
-  NotifyToUI(Format('Producer Thread n°%d Started', [FThreadNum]));
+  NameThreadForDebugging('Producer ' + FThreadNum.ToString);
+  NotifyToUI('Producer Thread ' + FThreadNum.ToString + ' Started');
   LExecContext := TDCAdlLocalExecContext.Create;
   try
     i:=1;
@@ -100,7 +100,7 @@ begin
   finally
     FreeAndNil(LExecContext);
   end;
-  NotifyToUI(Format('Producer Thread n°%d Terminated', [FThreadNum]));
+  NotifyToUI('Producer Thread ' + FThreadNum.ToString + ' Terminated');
 end;
 
 procedure TProducer.NotifyToUI(const msg: String);
@@ -135,8 +135,8 @@ var
   LExecContext: TDCAdlLocalExecContext;
 begin
   inherited;
-  NameThreadForDebugging(Format('Consumer n°%d', [FThreadNum]));
-  NotifyToUI(Format('Consumer Thread n°%d Started', [FThreadNum]));
+  NameThreadForDebugging('Consumer ' + FThreadNum.ToString);
+  NotifyToUI('Consumer Thread ' + FThreadNum.ToString + ' Started');
   LExecContext := TDCAdlLocalExecContext.Create;
   try
     while (FReceivedMessagesCopies.Count < FMessagesNbr) and (not Terminated) do
@@ -163,7 +163,7 @@ begin
   finally
     FreeAndNil(LExecContext);
   end;
-  NotifyToUI(Format('Consumer Thread n°%d Terminated', [FThreadNum]));
+  NotifyToUI('Consumer Thread ' + FThreadNum.ToString + ' Terminated');
 end;
 
 procedure TConsumer.NotifyToUI(const msg: String);
@@ -219,10 +219,10 @@ var
   LExecContext: TDCAdlLocalExecContext;
 begin
   inherited;
-  NameThreadForDebugging(Format('DeadLockTester n°%d', [FThreadNum]));
-  NotifyToUI(Format('DeadLockTester Thread n°%d Started', [FThreadNum]));
+  NameThreadForDebugging('DeadLockTester ' + FThreadNum);
+  NotifyToUI('DeadLockTester Thread ' + FThreadNum + ' Started');
+  LExecContext := TDCAdlLocalExecContext.Create;
   try
-    LExecContext := TDCAdlLocalExecContext.Create;
     try
       for i:=0 to FInstructions.Count-1 do
       begin
@@ -232,24 +232,45 @@ begin
           else LInstructionType := itUnLock;
         if (LInstructionType = itLock) then
         begin
-          NotifyToUI(Format('Before Lock for Thread n°%d', [FThreadNum]));
-          FSharedResources[LResourceNum-1].Lock(LExecContext);
-          NotifyToUI(Format('After Lock for Thread n°%d', [FThreadNum]));
+          NotifyToUI('Thread ' + FThreadNum + ' Before Lock for Resource ' + LResourceNum.ToString);
+          FSharedResources[LResourceNum-1].Lock(LExecContext, False); // ReadOnly: Boolean=True
+          NotifyToUI('Thread ' + FThreadNum + ' After Lock for Resource ' + LResourceNum.ToString);
         end else
         begin
-          NotifyToUI(Format('Before UnLock for Thread n°%d', [FThreadNum]));
+          NotifyToUI('Thread ' + FThreadNum + ' Before UnLock for Resource ' + LResourceNum.ToString);
           FSharedResources[LResourceNum-1].UnLock(LExecContext);
-          NotifyToUI(Format('After UnLock for Thread n°%d', [FThreadNum]));
+          NotifyToUI('Thread ' + FThreadNum + ' After UnLock for Resource ' + LResourceNum.ToString);
         end;
       end;
-    finally
-      FreeAndNil(LExecContext);
+    except
+      on e:Exception
+        do NotifyToUI('Exception "' + e.ClassName + '" on Thread ' + FThreadNum + ' : ' + e.message);
     end;
-  except
-    on e:Exception
-      do NotifyToUI(Format('Exception on Thread n°%d : %s', [FThreadNum, e.message]));
+  finally
+    try
+      FreeAndNil(LExecContext);
+    except
+      on e:Exception do
+      begin
+        NotifyToUI('Exception "' + e.ClassName + '" on Thread ' + FThreadNum + ' : ' + e.message);
+        while (LExecContext.CurrentLockOrder > 0) do
+        begin
+          for i:=0 to High(FSharedResources)
+          begin
+            if (FSharedResources[i].LockOrder = LExecContext.CurrentLockOrder) then
+            begin
+              FSharedResources[i].UnLock(LExecContext);
+              Break;
+            end;
+          end;
+        end;
+        try
+          FreeAndNil(LExecContext);
+        except ; end;
+      end;
+    end;
   end;
-  NotifyToUI(Format('DeadLockTester Thread n°%d Terminated', [FThreadNum]));
+  NotifyToUI('DeadLockTester Thread ' + FThreadNum + ' Terminated');
 end;
 
 procedure TDeadLockTester.NotifyToUI(const msg: String);
