@@ -154,6 +154,8 @@
 	We distinguish the following exceptions :</br>
 	
 	<h4>1- <b>TDCDeadLockException</b> :</h4>
+	
+	<h4>1- <b>TDCDeadLockException</b> :</h4>
 	<p>
 		The <em>DelphiConcurrent</em> API will throws this kind of exception whenever the <b>global lock order</b> is not respected. Programmers involved in a project managed with the <em>DelphiConcurrent</em> API must lock the shared resources following their <b>creation order</b> in memory. Which means that if the Resource <b>1</b> is created before the Resource <b>2</b> in memory than every thread which need to work on both resources at the same time must lock the Resource <b>1</b> before the Resource <b>2</b> and not the reverse.
 	</p>
@@ -166,13 +168,6 @@
 	<h4>3- <b>TDCBadUnlockSequenceException</b> :</h4>
 	<p>
 		The <em>DelphiConcurrent</em> API will throws an exception every time the good unlock order is not respected (which is the reverse of the lock order).
-	</p>
-	
-	<p>
-		<h4>1- The probability that a DEADLOCK occurs is not 100% :</h4>
-		A same written multi-threaded code can run in many ways showing a different behaviour sometime or everytime (we can have 100 running threads for example or 100 shared resources in our application).</br>
-		In example 1, the thread <b>A</b> may successfully lock the resources <b>1</b> and <b>2</b> before that the thread <b>B</b> is created or before that the thread <b>B</b> try to lock the resource <b>2</b>.</br>
-		This is a big engineering problem, because that means that code quality cannot be guaranteed simply by running test cases. The programmer may deliver to the client a code where he haven't found any error while testing it and some weeks later, the client is furious because the application (may be a server) freeze repeatedly and he must restart it eachtime the problem occurs, and the log file mysteriously doesn't show anything...
 	</p>
 </p>
 
