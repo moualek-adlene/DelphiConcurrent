@@ -2,7 +2,7 @@ unit DelphiConcurrent;
 
 // Delphi Concurrent Anti-DeadLock MultiRead FrameWork
 // Author : Moualek Adlene (moualek.adlene@gmail.com)
-// Version : 0.4
+// Version : 0.5
 // Project Start Date : 25/02/2018
 // Project URL : https://github.com/moualek-adlene/DelphiConcurrent
 
