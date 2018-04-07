@@ -1,7 +1,7 @@
 # DelphiConcurrent
 
 <p>
-	<em>DelphiConcurrent</em> is a new way to build Delphi applications which involve parallel executed code based on threads like application servers. <em>DelphiConcurrent</em> provide to the programmers the internal mechanisms to write safer multi-thread code while taking a special care of performance and genericity.
+	<em>DelphiConcurrent</em> is a new way to build Delphi applications which involve parallel executed code based on threads like application servers. <em>DelphiConcurrent</em> provides to the programmers the internal mechanisms to write safer multi-thread code while taking a special care of performance and genericity.
 </p>
 
 <h2>The main goals of this API are the following :</h2>
@@ -43,22 +43,22 @@
 </p>
 
 <p>
-	Every programmer knows that DEADLOCKs are very difficult to detect because of two factors :</br>
+	Every programmer knows that the DEADLOCKs are very difficult to detect because of two factors :</br>
 	<p>
 		A- <b>The probability that a DEADLOCK occurs is not 100% :</b></br>
 		A same written multi-threaded code can run in many ways showing a different behaviour sometime or everytime (we can have 100 running threads for example or 100 shared resources in our application).</br>
 		In the previous example, the thread <b>A</b> may successfully lock the resources <b>1</b> and <b>2</b> before that the thread <b>B</b> is created or before that the thread <b>B</b> try to lock the resource <b>2</b>.</br>
-		This is a big engineering problem, because that means that code quality cannot be guaranteed simply by running test cases. The programmer may deliver to the client a code where he haven't found any error while testing it and some weeks later, the client is furious because the application (may be a server) freeze repeatedly and he must restart it eachtime the problem occurs, and the log file mysteriously doesn't show anything...
+		This is a big engineering problem, because that means that code quality cannot be guaranteed simply by running test cases. The programmer may deliver to the client a code where he haven't found any error while testing it and some weeks later, the client is furious because the application (may be a server) freezes repeatedly and he must restart it eachtime the problem occurs, and the log file mysteriously doesn't show anything...
 	</p>
 	<p>
 		B- <b>A DEADLOCK leaves no trace :</b></br>
-		Threads are like human beings, they can't talk after they are dead !. Mutually blocked threads will not fire any exception saying 'We are blocked', they will just freeze forever. No exception means also no entry in the log output, so analysing the application log file will not help to discover or resolve the problem.</br>
+		Threads are like the human beings, they can't talk after they are dead !. Mutually blocked threads will not fire any exception saying 'We are blocked', they will just freeze forever. No exception means also no entry in the log output, so analysing the application log file will not help to discover or resolve the problem.</br>
 		Moreover, some of the locked resources may be critical which means that these resources may by used globally by the other application threads and this will lead to an overall application failure progressively (deny of service).
 	</p>
 </p>
 
 <p>
-	<em>DelphiConcurrent</em> can protect the threads from DEADLOCKs by a correct monitoring of the lock/unlock sequences at runtime and an explicit exception raised when the problem is detected. This is done with a probability of 100% even if the DEADLOCK doesn't occurs, hence the code quality (the thread safety part) is guaranteed at project end.
+	<em>DelphiConcurrent</em> can protect the threads from DEADLOCKs by a correct monitoring of the lock/unlock sequences at runtime and an explicit exception raised when the problem is detected. This is done with a probability of 100% even if the DEADLOCK doesn't occurs, hence the code quality (the thread safety part) is guaranteed at the project end.
 </p>
 
 <p>
@@ -73,13 +73,13 @@
 
 <p>
 	<h3>4- Provide a High-Performance Threading Model based on the MREW model :</h3>
-	<em>DelphiConcurrent</em> implements the Multi-Read Exclusive-Write (MREW) threads synchronization model. This model of parallel threads execution is more efficient than the other synchronization schemas based on Critical-Sections or Monitors because it doesn't prevent parallel threads from reading at the same time from a shared resource, exclusive access is only needed when writing to the resource. The MREW is therefore the default synchronization model used in <em>DelphiConcurrent</em>, however other synchronization schemas (Critical-Sections and Monitors) are also implemented and can be easily used if necessary.
+	<em>DelphiConcurrent</em> implements the Multi-Read Exclusive-Write (MREW) threads synchronization model. This model of parallel threads execution is more efficient than the other synchronization schemas based on Critical-Sections or Monitors because it doesn't prevent parallel threads from reading at the same time from a shared resource, exclusive access is only needed when writing to the resource. The MREW is therefore the default synchronization model used in <em>DelphiConcurrent</em>, however the other synchronization schemas (Critical-Sections and Monitors) are also implemented and can be easily used if necessary.
 </p>
 
 <h2>DelphiConcurrent API Presentation :</h2>
 
 <p>
-	The API is encapsulated in the Delphi Unit named "<b>DelphiConcurrent.pas</b>".</br>
+	This API is encapsulated in the Delphi Unit named "<b>DelphiConcurrent.pas</b>".</br>
 	A running Delphi example (Project and Binary) is available in the <b>GitHub</b> repository in order to see how this API works. The example is build on Delphi 10.1 Berlin Edition.
 </p>
 
