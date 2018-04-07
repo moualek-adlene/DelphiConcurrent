@@ -110,7 +110,7 @@
 	var
 		GSharedResource: TDCProtector;
 	begin
-	    // we need for example, a thread-safe TList, and
+		// we need for example, a thread-safe TList, and
 		// we choose to protect it with a Multi-Read Exclusive-Write Synchronizer
 		GSharedResource := TDCProtector.Create(TDCProtectedList, ltMREW);
 		try
@@ -128,7 +128,7 @@
 	begin
 		LExecContext := TDCLocalExecContext.Create;
 		try
-		    try
+			try
 				LResourcePointer := GSharedResource.Lock(LExecContext);
 				try
 					<Some work with the shared resource LResourcePointer ...>
