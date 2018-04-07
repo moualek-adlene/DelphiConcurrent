@@ -9,7 +9,7 @@
 <p>
 	<h3>1- Detect and Prevent DEADLOCKs before they occurs :</h3>
 	In concurrent applications a DEADLOCK may occurs when two threads or more try to lock two consecutive shared resources or more but in a different order.
-	With <em>DelphiConcurrent</em>, a DEADLOCK is detected and automatically skipped - before he occurs - and the programmer has an explicit exception describing the multi-thread problem instead of a blocking DEADLOCK which freeze the application with no output log (and perhaps also the linked clients if we talk about an application server).</br>
+	With <em>DelphiConcurrent</em>, a DEADLOCK is detected and automatically skipped - before he occurs - and the programmer has an explicit exception describing the multi-thread problem instead of a blocking DEADLOCK which freeze the application with no output log (and perhaps also the linked clients if we talk about an application server).
 </p>
 
 <p>
@@ -107,41 +107,41 @@
 	A typical <em>DelphiConcurrent</em> API use will be the following :</br>
 	
 	// Some shared resource declared and allocated somewhere (in main-unit for example)
-	<b>var</b>
+	var
 		GSharedResource: TDCProtector;
-	<b>begin</b>
-	    // we need for example, a thread-safe <b>TList</b>, and
-		// we choose to protect it with a <b>Multi-Read Exclusive-Write Synchronizer</b>
+	begin
+	    // we need for example, a thread-safe TList, and
+		// we choose to protect it with a Multi-Read Exclusive-Write Synchronizer
 		GSharedResource := TDCProtector.Create(TDCProtectedList, ltMREW);
-		<b>try</b>
+		try
 			Thread(X, GSharedResource).Start;
 			Thread(X).WaitFor;
-		<b>finally</b>
+		finally
 			GSharedResource.Free;
-		<b>end;</b>
-	<b>end;</b>
+		end;
+	end;
 	
 	// Some Thread(X) implementation
-	<b>var</b>
+	var
 		LExecContext: TDCLocalExecContext;
 		LResourcePointer: TDCProtectedList;
-	<b>begin</b>
+	begin
 		LExecContext := TDCLocalExecContext.Create;
-		<b>try</b>
-		    <b>try</b>
+		try
+		    try
 				LResourcePointer := GSharedResource.Lock(LExecContext);
-				<b>try</b>
+				try
 					<Some work with the shared resource LResourcePointer ...>
-				<b>finally</b>
+				finally
 					GSharedResource.UnLock(LExecContext);
-				<b>end;</b>
-			<b>except</b>
+				end;
+			except
 				on e1:Exception	do NotifyToUI('Exception "' + e1.ClassName + '" : ' + e1.message);
-			<b>end;</b>
-		<b>finally</b>
+			end;
+		finally
 			LExecContext.Free;
-		<b>end;</b>
-	<b>end;</b>
+		end;
+	end;
 </p>
 
 <p>
