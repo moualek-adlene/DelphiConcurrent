@@ -9,12 +9,12 @@
 <p>
 	<h3>1- Detect and Prevent DEADLOCKs before they occurs :</h3>
 	In concurrent applications a DEADLOCK may occurs when two threads or more try to lock two consecutive shared resources or more but in a different order.
-	With <em>DelphiConcurrent</em>, a DEADLOCK is detected and automatically skipped - before he occurs - and the programmer has an explicit exception describing the multi-thread problem instead of a blocking DEADLOCK which freeze the application with no output log (and perhaps also the linked clients if we talk about an application server).
+	With <em>DelphiConcurrent</em>, a DEADLOCK is detected and automatically skipped - before he occurs - and the programmer has an explicit exception describing the multi-thread problem instead of a blocking DEADLOCK which freeze the application with no output log (and perhaps also the linked clients sessions if we talk about an application server).
 </p>
 
 <p>
 	<h4>Example :</h4>
-	Suppose we have two threads <b>A</b> and <b>B</b>, and two shared resources <b>1</b> and <b>2</b>.</br>
+	Suppose that we have two threads <b>A</b> and <b>B</b>, and two shared resources <b>1</b> and <b>2</b>.</br>
 	Threads <b>A</b> and <b>B</b> execution sequences are the following :</br>
 	<table>
 		<tr>
@@ -39,7 +39,7 @@
 </p>
 
 <p>
-	When threads <b>A</b> and <b>B</b> start their parallel execution, the thread <b>A</b> owns exclusive access to resource <b>1</b> while the thread <b>B</b> does the same for the resource <b>2</b>. The DEADLOCK will occurs in the second step, when the thread <b>A</b> will wait indefinitely for getting access to resource <b>2</b> while the thread <b>B</b> wait indefinitely also for getting access to resource <b>1</b>. From this moment, the two threads are mutually blocked forever.
+	When the threads <b>A</b> and <b>B</b> start their parallel execution, the thread <b>A</b> owns exclusive access to the resource <b>1</b> while the thread <b>B</b> does the same for the resource <b>2</b>. The DEADLOCK will occur in the second step, when the thread <b>A</b> will wait indefinitely for getting access to the resource <b>2</b> while the thread <b>B</b> wait indefinitely also for getting access to the resource <b>1</b>. From this moment, the two threads are mutually blocked forever.
 </p>
 
 <p>
@@ -53,7 +53,7 @@
 	<p>
 		B- <b>A DEADLOCK leaves no trace :</b></br>
 		Threads are like human beings, they can't talk after they are dead !. Mutually blocked threads will not fire any exception saying 'We are blocked', they will just freeze forever. No exception means also no entry in the log output, so analysing the application log file will not help to discover or resolve the problem.</br>
-		Moreover, some of the locked resources may be critical which means that these resources may by used globally by the others application threads and this will lead to an overall application failure progressively (deny of service).
+		Moreover, some of the locked resources may be critical which means that these resources may by used globally by the other application threads and this will lead to an overall application failure progressively (deny of service).
 	</p>
 </p>
 
@@ -63,43 +63,43 @@
 
 <p>
 	<h3>2- Detect Remaining Locks :</h3>
-	Every time a programmer locks a shared resource on a concurrent application he must explicitly don't forget to unlock this resource to make it available again to others threads on the application. But a programmer is a human being and in a big or complex application he can easily forget to do that in some cases which will make one or more resources definitely inavailable to others threads with no exception (no log entry). It happens sometimes also that the programmer inserts -by mistake- a lock command in his source code instead of the unlock command needed. <em>DelphiConcurrent</em> handle this problem also by keeping trace of the programmer lock/unlook sequences and throwing an exception every time a shared resource is not unlocked at the good moment.
+	Every time a programmer locks a shared resource on a concurrent application he must explicitly don't forget to unlock this resource to make it available again to the other threads in the application. But a programmer is a human being and in a big or complex application he can easily forget to do that in some cases which will make one or more resources definitely inavailable to the other threads with no exception (no log entry). It happens sometimes also that the programmer inserts -by mistake- a lock command in his source code instead of the unlock command needed. <em>DelphiConcurrent</em> handles this problem also by keeping trace of the programmer lock/unlook sequences and throwing an exception every time a shared resource is not unlocked at the good moment.
 </p>
 
 <p>
 	<h3>3- Detect Bad Unlocks Sequences :</h3>
-	This is more an additional comfort than a real problem, because a programmer is not theoretically constrained to unlock a set of shared resources in a special order, but it is a good practice to do that in the correct order (which is the reverse of the lock order). So, <em>DelphiConcurrent</em> will also throws an exception every time the good unlock order is not respected.
+	This is more an additional comfort than a real problem, because a programmer is not theoretically constrained to unlock a set of shared resources in a special order, but it is a good practice to do that in the correct order (which is the reverse of the lock order). So, <em>DelphiConcurrent</em> will also throw an exception every time the good unlock order is not respected.
 </p>
 
 <p>
 	<h3>4- Provide High-Performance threading model based on the MREW model :</h3>
-	<em>DelphiConcurrent</em> implements the Multi-Read Exclusive-Write (MREW) threads synchronization model. This model of parallel threads execution is more efficient than the others synchronization schemas based on Critical-Sections or Monitors because it doesn't prevent parallel threads from reading at the same time from a shared resource, exclusive access is only needed when writing to the resource. The MREW is therefore the default synchronization model used in <em>DelphiConcurrent</em>, however others synchronization schemas (Critical-Sections and Monitors) are also implemented and can be easily used if necessary.
+	<em>DelphiConcurrent</em> implements the Multi-Read Exclusive-Write (MREW) threads synchronization model. This model of parallel threads execution is more efficient than the other synchronization schemas based on Critical-Sections or Monitors because it doesn't prevent parallel threads from reading at the same time from a shared resource, exclusive access is only needed when writing to the resource. The MREW is therefore the default synchronization model used in <em>DelphiConcurrent</em>, however other synchronization schemas (Critical-Sections and Monitors) are also implemented and can be easily used if necessary.
 </p>
 
 <h2>DelphiConcurrent API Presentation :</h2>
 
 <p>
-	The API is encapsulated in the Delphi Unit named "DelphiConcurrent.pas".</br>
-	A running Delphi example (Project and Binary) is available in the GitHub repository in order to see how this API works. The example is build on Delphi 10.1 Berlin Edition.
+	The API is encapsulated in the Delphi Unit named "<b>DelphiConcurrent.pas</b>".</br>
+	A running Delphi example (Project and Binary) is available in the <b>GitHub</b> repository in order to see how this API works. The example is build on Delphi 10.1 Berlin Edition.
 </p>
 
 <p>
 	<em>DelphiConcurrent</em> uses the concept of "<b>Lock on resource</b>" rather than "<b>Lock on code</b>" because it is impossible to guarantee a zero-fault multi-threaded code if we leave the control to the programmer (or the development team) for managing the kind of problems described before.
-	DEADLOCKs or Forgotten-LOCKs especially must be detected <b>By Design</b> and not just if they occurs someday.
+	The DEADLOCKs or Forgotten-LOCKs especially must be detected <b>By Design</b> and not just if they occurs someday.
 </p>
 
 <p>
 	Each shared resource is represented in <em>DelphiConcurrent</em> by an instance of a class derived from the class <b>TDCProtected</b>. We can use for example the <b>TDCProtectedList</b> sub-class to have a thread-safe <b>TList</b> that way.</br>
-	This shared resource will not be accessible directly at runtime, rather it will be encapsulated in an object of the class <b>TDCProtector</b> which associate the protected resource to some lock object or mechanism. This last may be a <b>Monitor</b> or an instance of the class <b>TCriticalSection</b> or <b>TDCMultiReadExclusiveWriteSynchronizer</b>.
+	This shared resource will not be accessible directly at runtime, rather it will be encapsulated in an object of the class <b>TDCProtector</b> which associates the protected resource to some lock object or mechanism. This last may be a <b>Monitor</b> or an instance of the class <b>TCriticalSection</b> or <b>TDCMultiReadExclusiveWriteSynchronizer</b>.
 </p>
 
 <p>
-	In theory, if we want to avoid DEADLOCKs in your concurrent code, we must ensure that resources are locked in the same order everytime we access them, in every portion of your source code. But in practice, this is very difficult to achieve, because a real application is made of different units (modules) each one containing perhaps some shared resources, and some of these resources may be allocated dynamically (not enumerated at design step), and as that was not enough there is maybe many programmers involved in the project and no programmer has a clear vision from start of what lock order must be respected by all the team.</br>
+	In theory, if we want to avoid the DEADLOCKs in our concurrent code, we must ensure that the resources are locked in the same order everytime we access them, in every portion of our source code. But in practice, this is very difficult to achieve, because a real application is made of different modules (units) each one containing perhaps some shared resources, and some of these resources may be allocated dynamically (not enumerated at design step), and as that was not enough there is maybe many programmers involved in the project and no programmer has a clear vision from project start of what lock order must be respected by all the team.</br>
 	This is way each resource in <em>DelphiConcurrent</em> will have a global order which determines at which moment we can access it compared to other resources (of all application modules). This global order is stored in the read-only property <b>TDCProtector.LockOrder</b> and will correspond (by convention) to the global creation order of shared resources at runtime.
 </p>
 
 <p>
-	<em>DelphiConcurrent</em> introduce a Local-Execution-Context class named <b>TDCLocalExecContext</b> to monitor the overall lock/unlock sequences in each running thread. As indicated by his name, each allocated context is local to his thread (Don't try to share those contexts between threads). The <b>TDCLocalExecContext</b> keeps an eye on each lock/unlock instruction and will throws an exception if any problem is detected. It is it's responsibility to detect and prevent DEADLOCKs.
+	<em>DelphiConcurrent</em> introduces a <b>Local-Execution-Context</b> class named <b>TDCLocalExecContext</b> to monitor the overall lock/unlock sequences in each running thread. As indicated by his name, each allocated context is local to his thread (Don't try to share those contexts between threads). The <b>TDCLocalExecContext</b> keeps an eye on each lock/unlock instruction and will throw an exception if any problem is detected. It is it's responsibility to detect and prevent the DEADLOCKs.
 </p>
 
 <p>
@@ -144,24 +144,24 @@
 </p>
 
 <p>
-	The running Delphi example available in the GitHub repository handles some advanced topics like how to automatically react to a DEADLOCK. We can for example, not just fill a log file or show a message on the screen but also release any previously locked resources (unlock them) to -at least- restore those resources to others threads (look at the implementation of the procedure <b>TDeadLockTester.Execute</b> in the <b>ThreadsUnit.pas</b> for that).
+	The running Delphi example available in the <b>GitHub</b> repository handles some advanced topics like how to automatically react to a DEADLOCK. We can for example, not just fill a log file or show a message on the screen but also release any previously locked resources (unlock them) to -at least- restore those resources to the other threads (look at the implementation of the procedure <b>TDeadLockTester.Execute</b> in the <b>ThreadsUnit.pas</b> for that).
 </p>
 
 <p>
-	<h3>DelphiConcurrent Exceptions Classes :</h3>
+	<h3>DelphiConcurrent Exception Classes :</h3>
 	All the <em>DelphiConcurrent</em> exception classes derive from the <b>TDCException</b> class.</br>
 	We distinguish the following exceptions :</br>
 	<p>
 		1- <b>TDCDeadLockException</b> :</br>
-		The <em>DelphiConcurrent</em> API will throws this kind of exception whenever the <b>global lock order</b> is not respected. Programmers involved in a project managed with the <em>DelphiConcurrent</em> API must lock the shared resources following their <b>creation order</b> in memory. Which means that if the Resource <b>1</b> is created before the Resource <b>2</b> in memory than every thread which need to work on both resources at the same time must lock the Resource <b>1</b> before the Resource <b>2</b> and not the reverse.
+		The <em>DelphiConcurrent</em> API will throw this kind of exception whenever the <b>global lock order</b> is not respected. Programmers involved in a project managed with the <em>DelphiConcurrent</em> API must lock the shared resources following their <b>creation order</b> in memory. Which means that if a Resource <b>1</b> is created before a Resource <b>2</b> in memory than every thread which need to work on both resources at the same time must lock the Resource <b>1</b> before the Resource <b>2</b> and not the reverse.
 	</p>
 	<p>
 		2- <b>TDCRemainingLocksException</b> :</br>
-		Before a <b>TDCLocalExecContext</b> is destroyed, it will check that there is <b>no remaining active locks</b> and will throws this kind of exception if the problem is detected.
+		Before a <b>TDCLocalExecContext</b> is destroyed, it will check that there is <b>no remaining active locks</b> and will throw this kind of exception if the problem is detected.
 	</p>
 	<p>
 		3- <b>TDCBadUnlockSequenceException</b> :</br>
-		The <em>DelphiConcurrent</em> API will throws an exception every time the good unlock order is not respected (which is the reverse of the lock order).
+		The <em>DelphiConcurrent</em> API will throw an exception every time the good unlock order is not respected (which is the reverse of the lock order).
 	</p>
 </p>
 
