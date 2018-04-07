@@ -71,7 +71,7 @@ type
     procedure Scenario_B_ListBoxChange(Sender: TObject);
   private
     { Déclarations privées }
-    SharedResourcesLst: array [0..3] of TDCThreaded;
+    SharedResourcesLst: array [0..3] of TDCProtector;
     ProducersLst: array of TProducer;
     ConsumersLst: array of TConsumer;
     DeadLock_Test_Thread_A, DeadLock_Test_Thread_B: TDeadLockTester;
@@ -205,7 +205,7 @@ procedure TMainForm.Run_Scenarios_ButtonClick(Sender: TObject);
 var
   i, j: Integer;
   MessagesLockType: TDCLockType;
-  LExecContext: TDCAdlLocalExecContext;
+  LExecContext: TDCLocalExecContext;
   LResourcePointer: TDCProtected;
 begin
   Is_Scenarios_Running := True;
@@ -223,7 +223,7 @@ begin
     else
       MessagesLockType := ltMonitor;
     for i:=1 to 3 do
-      SharedResourcesLst[i] := TDCThreaded.Create(TDCProtectedList, MessagesLockType);
+      SharedResourcesLst[i] := TDCProtector.Create(TDCProtectedList, MessagesLockType);
     //
     DeadLock_Test_Thread_A := TDeadLockTester.Create('A', SharedResourcesLst, Scenario_A_ListBox.Items);
     DeadLock_Test_Thread_B := TDeadLockTester.Create('B', SharedResourcesLst, Scenario_B_ListBox.Items);
@@ -238,7 +238,7 @@ begin
 
     for i:=1 to 3 do
     begin
-      LExecContext := TDCAdlLocalExecContext.Create;
+      LExecContext := TDCLocalExecContext.Create;
       LResourcePointer := SharedResourcesLst[i].Lock(LExecContext, False); // ReadOnly: Boolean=True
       try
         if (LResourcePointer is TDCProtectedList) then
@@ -289,7 +289,7 @@ begin
   else
     MessagesLockType := ltMonitor;
 
-  SharedResourcesLst[0] := TDCThreaded.Create(TDCProtectedList, MessagesLockType);
+  SharedResourcesLst[0] := TDCProtector.Create(TDCProtectedList, MessagesLockType);
   SetLength(ProducersLst, ProducersNbr);
   SetLength(ConsumersLst, ConsumersNbr);
 
@@ -309,7 +309,7 @@ end;
 procedure TMainForm.StopButtonClick(Sender: TObject);
 var
   i: Integer;
-  LExecContext: TDCAdlLocalExecContext;
+  LExecContext: TDCLocalExecContext;
   LResourcePointer: TDCProtected;
 begin
   StopButton.Enabled := False;
@@ -337,7 +337,7 @@ begin
   end;
   Finalize(ProducersLst);
   Finalize(ConsumersLst);
-  LExecContext := TDCAdlLocalExecContext.Create;
+  LExecContext := TDCLocalExecContext.Create;
   LResourcePointer := SharedResourcesLst[0].Lock(LExecContext, False); // ReadOnly: Boolean=True
   try
     if (LResourcePointer is TDCProtectedList) then

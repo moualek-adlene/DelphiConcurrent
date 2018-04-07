@@ -20,9 +20,9 @@ type
   TProducer = class(TThread)
   private
     FThreadNum, FMessagesNbr: Integer; // here FMessagesNbr = Nbr of messages to produce
-    FSharedResource: TDCThreaded;
+    FSharedResource: TDCProtector;
   public
-    constructor Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCThreaded);
+    constructor Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCProtector);
     procedure Execute; override;
     procedure NotifyToUI(const msg: String);
     property ThreadNum: Integer read FThreadNum write FThreadNum;
@@ -31,10 +31,10 @@ type
   TConsumer = class(TThread)
   private
     FThreadNum, FMessagesNbr: Integer; // here FMessagesNbr = Nbr of messages to consume
-    FSharedResource: TDCThreaded;
+    FSharedResource: TDCProtector;
     FReceivedMessagesCopies: TObjectList<TExchangedMessage>;
   public
-    constructor Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCThreaded);
+    constructor Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCProtector);
     destructor Destroy; override;
     procedure Execute; override;
     procedure NotifyToUI(const msg: String);
@@ -44,10 +44,10 @@ type
   TDeadLockTester = class(TThread)
   private
     FThreadNum: Char;
-    FSharedResources: array of TDCThreaded;
+    FSharedResources: array of TDCProtector;
     FInstructions: TStringList;
   public
-    constructor Create(const AThreadNum: Char; ASharedResources: array of TDCThreaded; AInstructions: TStrings);
+    constructor Create(const AThreadNum: Char; ASharedResources: array of TDCProtector; AInstructions: TStrings);
     destructor Destroy; override;
     procedure Execute; override;
     procedure NotifyToUI(const msg: String);
@@ -61,7 +61,7 @@ uses
 
 { TProducer }
 
-constructor TProducer.Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCThreaded);
+constructor TProducer.Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCProtector);
 begin
   inherited Create();
   FThreadNum := AThreadNum;
@@ -74,12 +74,12 @@ var
   i: Integer;
   LExchangedMessage: TExchangedMessage;
   LResourcePointer: TDCProtected;
-  LExecContext: TDCAdlLocalExecContext;
+  LExecContext: TDCLocalExecContext;
 begin
   inherited;
   NameThreadForDebugging('Producer ' + FThreadNum.ToString);
   NotifyToUI('Producer Thread ' + FThreadNum.ToString + ' Started');
-  LExecContext := TDCAdlLocalExecContext.Create;
+  LExecContext := TDCLocalExecContext.Create;
   try
     i:=1;
     while (i <= FMessagesNbr) and (not Terminated) do
@@ -112,7 +112,7 @@ end;
 
 { TConsumer }
 
-constructor TConsumer.Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCThreaded);
+constructor TConsumer.Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCProtector);
 begin
   inherited Create();
   FThreadNum := AThreadNum;
@@ -132,12 +132,12 @@ var
   i: Integer;
   LResourcePointer: TDCProtected;
   LExchangedMessageCopy: TExchangedMessage;
-  LExecContext: TDCAdlLocalExecContext;
+  LExecContext: TDCLocalExecContext;
 begin
   inherited;
   NameThreadForDebugging('Consumer ' + FThreadNum.ToString);
   NotifyToUI('Consumer Thread ' + FThreadNum.ToString + ' Started');
-  LExecContext := TDCAdlLocalExecContext.Create;
+  LExecContext := TDCLocalExecContext.Create;
   try
     while (FReceivedMessagesCopies.Count < FMessagesNbr) and (not Terminated) do
     begin
@@ -189,7 +189,7 @@ end;
 
 { TDeadLockTester }
 
-constructor TDeadLockTester.Create(const AThreadNum: Char; ASharedResources: array of TDCThreaded; AInstructions: TStrings);
+constructor TDeadLockTester.Create(const AThreadNum: Char; ASharedResources: array of TDCProtector; AInstructions: TStrings);
 var
   i: Integer;
 begin
@@ -216,12 +216,12 @@ type
 var
   i, LResourceNum: Integer;
   LInstructionType: TInstructionType;
-  LExecContext: TDCAdlLocalExecContext;
+  LExecContext: TDCLocalExecContext;
 begin
   inherited;
   NameThreadForDebugging('DeadLockTester ' + FThreadNum);
   NotifyToUI('DeadLockTester Thread ' + FThreadNum + ' Started');
-  LExecContext := TDCAdlLocalExecContext.Create;
+  LExecContext := TDCLocalExecContext.Create;
   try
     try
       for i:=0 to FInstructions.Count-1 do
@@ -243,30 +243,30 @@ begin
         end;
       end;
     except
-      on e:Exception
-        do NotifyToUI('Exception "' + e.ClassName + '" on Thread ' + FThreadNum + ' : ' + e.message);
+      on e1:Exception
+        do NotifyToUI('Exception "' + e1.ClassName + '" on Thread ' + FThreadNum + ' : ' + e1.message);
     end;
   finally
     try
-      FreeAndNil(LExecContext);
+      LExecContext.Free;
     except
-      on e:Exception do
+      on e2:Exception do
       begin
-        NotifyToUI('Exception "' + e.ClassName + '" on Thread ' + FThreadNum + ' : ' + e.message);
-        while (LExecContext.CurrentLockOrder > 0) do
+        NotifyToUI('Exception "' + e2.ClassName + '" on Thread ' + FThreadNum + ' : ' + e2.message);
+        {if (e2 is TDCDeadLockException) then
         begin
-          for i:=0 to High(FSharedResources)
+          while (LExecContext.CurrentLockOrder > 0) do
           begin
-            if (FSharedResources[i].LockOrder = LExecContext.CurrentLockOrder) then
+            for i:=0 to High(FSharedResources) do
             begin
-              FSharedResources[i].UnLock(LExecContext);
-              Break;
+              if (FSharedResources[i].LockOrder = LExecContext.CurrentLockOrder) then
+              begin
+                FSharedResources[i].UnLock(LExecContext);
+                Break;
+              end;
             end;
           end;
-        end;
-        try
-          FreeAndNil(LExecContext);
-        except ; end;
+        end;}
       end;
     end;
   end;
