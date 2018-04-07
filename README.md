@@ -7,7 +7,7 @@
 <h2>The main goals of this API are the following :</h2>
 
 <p>
-	<h3>1- Detect and Prevent DEADLOCKs before they occurs :</h3>
+	<h3>1- Detect and Prevent DEADLOCKs before they occur :</h3>
 	In concurrent applications a DEADLOCK may occurs when two threads or more try to lock two consecutive shared resources or more but in a different order.
 	With <em>DelphiConcurrent</em>, a DEADLOCK is detected and automatically skipped - before he occurs - and the programmer has an explicit exception describing the multi-thread problem instead of a blocking DEADLOCK which freeze the application with no output log (and perhaps also the linked clients sessions if we talk about an application server).
 </p>
