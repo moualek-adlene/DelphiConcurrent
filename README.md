@@ -62,17 +62,17 @@
 </p>
 
 <p>
-	<h3>2- Detect Remaining Locks :</h3>
+	<h3>2- Detect the Remaining Locks :</h3>
 	Every time a programmer locks a shared resource on a concurrent application he must explicitly don't forget to unlock this resource to make it available again to the other threads in the application. But a programmer is a human being and in a big or complex application he can easily forget to do that in some cases which will make one or more resources definitely inavailable to the other threads with no exception (no log entry). It happens sometimes also that the programmer inserts -by mistake- a lock command in his source code instead of the unlock command needed. <em>DelphiConcurrent</em> handles this problem also by keeping trace of the programmer lock/unlook sequences and throwing an exception every time a shared resource is not unlocked at the good moment.
 </p>
 
 <p>
-	<h3>3- Detect Bad Unlocks Sequences :</h3>
+	<h3>3- Detect the Bad Unlocks Sequences :</h3>
 	This is more an additional comfort than a real problem, because a programmer is not theoretically constrained to unlock a set of shared resources in a special order, but it is a good practice to do that in the correct order (which is the reverse of the lock order). So, <em>DelphiConcurrent</em> will also throw an exception every time the good unlock order is not respected.
 </p>
 
 <p>
-	<h3>4- Provide High-Performance threading model based on the MREW model :</h3>
+	<h3>4- Provide a High-Performance Threading Model based on the MREW model :</h3>
 	<em>DelphiConcurrent</em> implements the Multi-Read Exclusive-Write (MREW) threads synchronization model. This model of parallel threads execution is more efficient than the other synchronization schemas based on Critical-Sections or Monitors because it doesn't prevent parallel threads from reading at the same time from a shared resource, exclusive access is only needed when writing to the resource. The MREW is therefore the default synchronization model used in <em>DelphiConcurrent</em>, however other synchronization schemas (Critical-Sections and Monitors) are also implemented and can be easily used if necessary.
 </p>
 
