@@ -48,10 +48,7 @@
 		A- <b>The probability that a DEADLOCK occurs is not 100% :</b></br>
 		A same written multi-threaded code can run in many ways showing a different behaviour sometime or everytime (we can have 100 running threads for example or 100 shared resources in our application).</br>
 		In example 1, the thread <b>A</b> may successfully lock the resources <b>1</b> and <b>2</b> before that the thread <b>B</b> is created or before that the thread <b>B</b> try to lock the resource <b>2</b>.</br>
-		This is a big engineering problem, because that means that code quality cannot be guaranteed simply by running test cases. The programmer may deliver to the client a code where he haven't found any error while testing it and some weeks later, the client is furious because the application (may be a server) freeze repeatedly and he must restart it eachtime the problem occurs, and the log file mysteriously doesn't show anything...
-	</p>
-	
-	<p>
+		This is a big engineering problem, because that means that code quality cannot be guaranteed simply by running test cases. The programmer may deliver to the client a code where he haven't found any error while testing it and some weeks later, the client is furious because the application (may be a server) freeze repeatedly and he must restart it eachtime the problem occurs, and the log file mysteriously doesn't show anything...</br>
 		B- <b>A DEADLOCK leaves no trace :</b></br>
 		Threads are like human beings, they can't talk after they are dead. Mutually blocked threads will not fire any exception saying 'We are blocked', they will just freeze forever. No exception means also no entry in the log output, so analysing the application log file will not help to discover or resolve the problem.</br>
 		Moreover, some of the locked resources may be critical which means that these resources may by used globally by the others application threads and this will lead to an overall application failure progressively (deny of service).
