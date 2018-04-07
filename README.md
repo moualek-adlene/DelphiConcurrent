@@ -153,18 +153,18 @@
 	All the <em>DelphiConcurrent</em> exception classes derive from the <b>TDCException</b> class.</br>
 	We distinguish the following exceptions :</br>
 	
+	<h4>1- <b>TDCDeadLockException</b> :</h4>
 	<p>
-		<h4>1- <b>TDCDeadLockException</b> :</h4>
 		The <em>DelphiConcurrent</em> API will throws this kind of exception whenever the <b>global lock order</b> is not respected. Programmers involved in a project managed with the <em>DelphiConcurrent</em> API must lock the shared resources following their <b>creation order</b> in memory. Which means that if the Resource <b>1</b> is created before the Resource <b>2</b> in memory than every thread which need to work on both resources at the same time must lock the Resource <b>1</b> before the Resource <b>2</b> and not the reverse.
 	</p>
 	
+	<h4>2- <b>TDCRemainingLocksException</b> :</h4>
 	<p>
-		<h4>2- <b>TDCRemainingLocksException</b> :</h4>
 		Before a <b>TDCLocalExecContext</b> is destroyed, it will check that there is <b>no remaining active locks</b> and will throws this kind of exception if the problem is detected.
 	</p>
 	
+	<h4>3- <b>TDCBadUnlockSequenceException</b> :</h4>
 	<p>
-		<h4>3- <b>TDCBadUnlockSequenceException</b> :</h4>
 		The <em>DelphiConcurrent</em> API will throws an exception every time the good unlock order is not respected (which is the reverse of the lock order).
 	</p>
 </p>
