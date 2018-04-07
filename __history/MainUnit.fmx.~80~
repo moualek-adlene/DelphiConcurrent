@@ -388,7 +388,7 @@ object MainForm: TMainForm
         Text = 'Producers Nbr :'
       end
       object ExecTimeLabel: TLabel
-        Position.X = 216.000000000000000000
+        Position.X = 232.000000000000000000
         Position.Y = 171.000000000000000000
         Size.Width = 57.000000000000000000
         Size.Height = 17.000000000000000000
@@ -396,7 +396,7 @@ object MainForm: TMainForm
         Text = '................'
       end
       object lbl4: TLabel
-        Position.X = 152.000000000000000000
+        Position.X = 160.000000000000000000
         Position.Y = 171.000000000000000000
         Size.Width = 65.000000000000000000
         Size.Height = 17.000000000000000000

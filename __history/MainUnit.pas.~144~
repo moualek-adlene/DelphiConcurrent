@@ -11,32 +11,34 @@ uses
 
 type
   TMainForm = class(TForm)
+    Layout1: TLayout;
     Synchronizer_GroupBox: TGroupBox;
     Monitor_RadioButton: TRadioButton;
     CriticalSection_RadioButton: TRadioButton;
     DCMRER_RadioButton: TRadioButton;
     DeadLock_Detection_GroupBox: TGroupBox;
     Thread_A_Def_GroupBox: TGroupBox;
-    Thread_B_Def_GroupBox: TGroupBox;
     Instructions_Set_A_ComboBox: TComboBox;
-    Instructions_Set_B_ComboBox: TComboBox;
     Add_Instruction_A_Button: TButton;
-    Add_Instruction_B_Button: TButton;
     Label5: TLabel;
-    Label6: TLabel;
     Scenario_A_ListBox: TListBox;
-    Scenario_B_ListBox: TListBox;
     Del_Instruction_A_Button: TButton;
-    Del_Instruction_B_Button: TButton;
     MoveUp_Instruction_A_Button: TButton;
-    MoveUp_Instruction_B_Button: TButton;
     MoveDown_Instruction_A_Button: TButton;
-    MoveDown_Instruction_B_Button: TButton;
     Clear_Instruction_A_Button: TButton;
+    Thread_B_Def_GroupBox: TGroupBox;
+    Instructions_Set_B_ComboBox: TComboBox;
+    Add_Instruction_B_Button: TButton;
+    Label6: TLabel;
+    Scenario_B_ListBox: TListBox;
+    Del_Instruction_B_Button: TButton;
+    MoveUp_Instruction_B_Button: TButton;
+    MoveDown_Instruction_B_Button: TButton;
     Clear_Instruction_B_Button: TButton;
     Run_Scenarios_Button: TButton;
     DeadLock_Log_GroupBox: TGroupBox;
     DeadLock_Log_Memo: TMemo;
+    Layout2: TLayout;
     Speed_Test_GroupBox: TGroupBox;
     Speed_Test_Log_Memo: TMemo;
     MessagesNbrPerProducer_SpinBox: TSpinBox;
@@ -49,6 +51,7 @@ type
     lbl4: TLabel;
     StopButton: TButton;
     StartButton: TButton;
+    spl1: TSplitter;
     procedure StartButtonClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure StopButtonClick(Sender: TObject);
@@ -68,7 +71,7 @@ type
     procedure Scenario_B_ListBoxChange(Sender: TObject);
   private
     { Déclarations privées }
-    SharedResourcesLst: array [0..3] of TDCThreaded;
+    SharedResourcesLst: array [0..3] of TDCProtector;
     ProducersLst: array of TProducer;
     ConsumersLst: array of TConsumer;
     DeadLock_Test_Thread_A, DeadLock_Test_Thread_B: TDeadLockTester;
@@ -202,7 +205,7 @@ procedure TMainForm.Run_Scenarios_ButtonClick(Sender: TObject);
 var
   i, j: Integer;
   MessagesLockType: TDCLockType;
-  LExecContext: TDCAdlLocalExecContext;
+  LExecContext: TDCLocalExecContext;
   LResourcePointer: TDCProtected;
 begin
   Is_Scenarios_Running := True;
@@ -211,6 +214,7 @@ begin
   Thread_A_ActionsControl();
   Thread_B_ActionsControl();
   try
+    DeadLock_Log_Memo.Lines.Clear;
     if (DCMRER_RadioButton.IsChecked)
       then MessagesLockType := ltMREW
     else
@@ -218,16 +222,11 @@ begin
       then MessagesLockType := ltCriticalSection
     else
       MessagesLockType := ltMonitor;
-    // we want to simulate a deadlock but we dont want to have a real deadlock in this simulator
-    // because we can not skip out from a real deadlock and restart a new test without killing the application
-    // so the TDCThreaded has a special option made for this test case
     for i:=1 to 3 do
-      SharedResourcesLst[i] := TDCThreaded.Create(TDCProtectedList, MessagesLockType, True);
+      SharedResourcesLst[i] := TDCProtector.Create(TDCProtectedList, MessagesLockType);
     //
     DeadLock_Test_Thread_A := TDeadLockTester.Create('A', SharedResourcesLst, Scenario_A_ListBox.Items);
     DeadLock_Test_Thread_B := TDeadLockTester.Create('B', SharedResourcesLst, Scenario_B_ListBox.Items);
-    //
-
     //
     DeadLock_Test_Thread_A.WaitFor;
     DeadLock_Test_Thread_A.Free;
@@ -239,7 +238,7 @@ begin
 
     for i:=1 to 3 do
     begin
-      LExecContext := TDCAdlLocalExecContext.Create;
+      LExecContext := TDCLocalExecContext.Create;
       LResourcePointer := SharedResourcesLst[i].Lock(LExecContext, False); // ReadOnly: Boolean=True
       try
         if (LResourcePointer is TDCProtectedList) then
@@ -290,11 +289,11 @@ begin
   else
     MessagesLockType := ltMonitor;
 
-  SharedResourcesLst[0] := TDCThreaded.Create(TDCProtectedList, MessagesLockType);
+  SharedResourcesLst[0] := TDCProtector.Create(TDCProtectedList, MessagesLockType);
   SetLength(ProducersLst, ProducersNbr);
   SetLength(ConsumersLst, ConsumersNbr);
 
-  ExecTimeLabel.Text := '';
+  ExecTimeLabel.Text := 'Please wait...';
   Speed_Test_Log_Memo.Lines.Clear;
   Speed_Test_Log_Memo.Lines.BeginUpdate;
   StopButton.Enabled := True;
@@ -310,7 +309,7 @@ end;
 procedure TMainForm.StopButtonClick(Sender: TObject);
 var
   i: Integer;
-  LExecContext: TDCAdlLocalExecContext;
+  LExecContext: TDCLocalExecContext;
   LResourcePointer: TDCProtected;
 begin
   StopButton.Enabled := False;
@@ -338,7 +337,7 @@ begin
   end;
   Finalize(ProducersLst);
   Finalize(ConsumersLst);
-  LExecContext := TDCAdlLocalExecContext.Create;
+  LExecContext := TDCLocalExecContext.Create;
   LResourcePointer := SharedResourcesLst[0].Lock(LExecContext, False); // ReadOnly: Boolean=True
   try
     if (LResourcePointer is TDCProtectedList) then

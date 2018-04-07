@@ -293,7 +293,7 @@ begin
   SetLength(ProducersLst, ProducersNbr);
   SetLength(ConsumersLst, ConsumersNbr);
 
-  ExecTimeLabel.Text := '';
+  ExecTimeLabel.Text := 'Working...';
   Speed_Test_Log_Memo.Lines.Clear;
   Speed_Test_Log_Memo.Lines.BeginUpdate;
   StopButton.Enabled := True;
