@@ -152,6 +152,9 @@
 	<h3>DelphiConcurrent Exceptions Classes :</h3>
 	All the <em>DelphiConcurrent</em> exception classes derive from the <b>TDCException</b> class.</br>
 	We distinguish the following exceptions :</br>
+	TDCDeadLockException</br>
+	<b>TDCDeadLockException</b></br>
+	<b>TDCDeadLockException</b> :</br>
 	
 	<h4><b>TDCDeadLockException</b> :</h4></br>
 	
