@@ -53,7 +53,7 @@
 	
 	<p>
 		B- <b>A DEADLOCK leaves no trace :</b></br>
-		Threads are like human beings, they can't talk after they are dead !. Mutually blocked threads will not fire any exception saying 'We are blocked', they will just freeze forever. No exception means also no entry in the log output, so analysing the application log file will not help to discover or resolve the problem.</br>
+		Threads are like human beings, they can't talk after they are dead. Mutually blocked threads will not fire any exception saying 'We are blocked', they will just freeze forever. No exception means also no entry in the log output, so analysing the application log file will not help to discover or resolve the problem.</br>
 		Moreover, some of the locked resources may be critical which means that these resources may by used globally by the others application threads and this will lead to an overall application failure progressively (deny of service).
 	</p>
 </p>
