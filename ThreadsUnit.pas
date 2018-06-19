@@ -2,6 +2,8 @@ unit ThreadsUnit;
 
 interface
 
+{$I DelphiConcurrentTest.inc}
+
 uses
   System.Classes, System.Types, System.SyncObjs, System.SysUtils, System.Contnrs, System.Generics.Collections,
   DelphiConcurrent;
@@ -17,7 +19,7 @@ type
     property DT: TDateTime read FDT write FDT;
   end;
 
-  TProducer = class(TThread)
+  TProducer = class(TDCThread)
   private
     FThreadNum, FMessagesNbr: Integer; // here FMessagesNbr = Nbr of messages to produce
     FSharedResource: TDCProtector;
@@ -28,7 +30,7 @@ type
     property ThreadNum: Integer read FThreadNum write FThreadNum;
   end;
 
-  TConsumer = class(TThread)
+  TConsumer = class(TDCThread)
   private
     FThreadNum, FMessagesNbr: Integer; // here FMessagesNbr = Nbr of messages to consume
     FSharedResource: TDCProtector;
@@ -41,7 +43,7 @@ type
     property ThreadNum: Integer read FThreadNum write FThreadNum;
   end;
 
-  TDeadLockTester = class(TThread)
+  TDeadLockTester = class(TDCThread)
   private
     FThreadNum: Char;
     FSharedResources: array of TDCProtector;
@@ -79,7 +81,11 @@ begin
   inherited;
   NameThreadForDebugging('Producer ' + FThreadNum.ToString);
   NotifyToUI('Producer Thread ' + FThreadNum.ToString + ' Started');
+  {$ifdef USE_EXPLICIT_CONTEXTS}
   LExecContext := TDCLocalExecContext.Create;
+  {$else}
+  LExecContext := nil;
+  {$endif}
   try
     i:=1;
     while (i <= FMessagesNbr) and (not Terminated) do
@@ -137,7 +143,11 @@ begin
   inherited;
   NameThreadForDebugging('Consumer ' + FThreadNum.ToString);
   NotifyToUI('Consumer Thread ' + FThreadNum.ToString + ' Started');
+  {$ifdef USE_EXPLICIT_CONTEXTS}
   LExecContext := TDCLocalExecContext.Create;
+  {$else}
+  LExecContext := nil;
+  {$endif}
   try
     while (FReceivedMessagesCopies.Count < FMessagesNbr) and (not Terminated) do
     begin
@@ -221,7 +231,11 @@ begin
   inherited;
   NameThreadForDebugging('DeadLockTester ' + FThreadNum);
   NotifyToUI('DeadLockTester Thread ' + FThreadNum + ' Started');
+  {$ifdef USE_EXPLICIT_CONTEXTS}
   LExecContext := TDCLocalExecContext.Create;
+  {$else}
+  LExecContext := nil;
+  {$endif}
   try
     try
       for i:=0 to FInstructions.Count-1 do
@@ -247,6 +261,7 @@ begin
         do NotifyToUI('Exception "' + e1.ClassName + '" on Thread ' + FThreadNum + ' : ' + e1.message);
     end;
   finally
+    if (LExecContext <> nil) then
     try
       // First attempt to free the local execution context, will fail if any lock is missed active (by the programmer or a deadlock sequence)
       LExecContext.Free; // BE CAREFULL: DONT USE FreeAndNil() HERE !

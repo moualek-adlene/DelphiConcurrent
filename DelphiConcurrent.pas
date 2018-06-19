@@ -2,7 +2,7 @@ unit DelphiConcurrent;
 
 // Delphi Concurrent Anti-DeadLock MultiRead FrameWork
 // Author : Moualek Adlene (moualek.adlene@gmail.com)
-// Version : 0.5
+// Version : 0.6
 // Project Start Date : 25/02/2018
 // Project URL : https://github.com/moualek-adlene/DelphiConcurrent
 
@@ -20,6 +20,7 @@ type
   TDCRemainingLocksException = class(TDCException);
   TDCBadUnlockSequenceException = class(TDCException);
   TDCRWLockNeededException = class(TDCException);
+  TDCNoLocalExecContextException = class(TDCException);
   TDCLockType = (ltMREW, ltCriticalSection, ltMonitor);
 
   // Delphi Concurrent Multi-Read Exclusive-Write Synchronizer Class
@@ -39,12 +40,22 @@ type
     FLockOrdersStack: TStack<Integer>;
     function GetCurrentLockOrder(): Integer; inline;
   public
-    class function GetNextLockOrder(): Integer;
     constructor Create();
     destructor Destroy; override;
     procedure PushLockOrder(const ALockOrder: Integer); inline;
     function PopLockOrder: Integer; inline;
     property CurrentLockOrder: Integer read GetCurrentLockOrder;
+  end;
+
+  // Delphi Thread with a Local Execution Context
+  TDCThread = class(TThread)
+  private
+    FDCLocalExecContext: TDCLocalExecContext;
+  public
+    constructor Create; overload;
+    constructor Create(CreateSuspended: Boolean); overload;
+    destructor Destroy; override;
+    property DCLocalExecContext: TDCLocalExecContext read FDCLocalExecContext;
   end;
 
   // Delphi Concurrent Protector Class
@@ -54,12 +65,14 @@ type
     FLockObject: TObject;
     FLockType: TDCLockType;
     FLockOrder: Integer;
+    class var NextSharedObjectLockOrder: Integer;
+    class function GetNextLockOrder(): Integer;
   public
     constructor Create(ADCProtectedClass: TDCProtectedClass; ALockType: TDCLockType=ltMREW);
     destructor Destroy; override;
     // Be optimist for Multi-Read, Use Read-Write Mode (Exclusif Access) only when necessary
-    function Lock(AExecContext: TDCLocalExecContext; AReadOnly: Boolean=True): TDCProtected; inline;
-    procedure Unlock(AExecContext: TDCLocalExecContext); inline;
+    function Lock(AExecContext: TDCLocalExecContext=nil; AReadOnly: Boolean=True): TDCProtected; //inline;
+    procedure Unlock(AExecContext: TDCLocalExecContext=nil); //inline;
     property LockObject: TObject read FLockObject;
     property LockType: TDCLockType read FLockType;
     property LockOrder: Integer read FLockOrder;
@@ -199,8 +212,6 @@ type
 
 implementation
 
-var NextSharedObjectLockOrder: Integer = 0;
-
 { TDCMultiReadExclusiveWriteSynchronizer }
 
 constructor TDCMultiReadExclusiveWriteSynchronizer.Create;
@@ -249,11 +260,6 @@ begin
     else Result := 0;
 end;
 
-class function TDCLocalExecContext.GetNextLockOrder: Integer;
-begin
-  Result := TInterlocked.Increment(NextSharedObjectLockOrder);
-end;
-
 function TDCLocalExecContext.PopLockOrder: Integer;
 begin
   Result := Integer(FLockOrdersStack.Pop);
@@ -276,7 +282,7 @@ begin
     ltMonitor: FLockObject := nil;
   end;
   FSharedObject := ADCProtectedClass.Create(Self);
-  FLockOrder := TDCLocalExecContext.GetNextLockOrder();
+  FLockOrder := GetNextLockOrder();
 end;
 
 destructor TDCProtector.Destroy;
@@ -289,8 +295,25 @@ begin
   end;
 end;
 
-function TDCProtector.Lock(AExecContext: TDCLocalExecContext; AReadOnly: Boolean): TDCProtected;
+class function TDCProtector.GetNextLockOrder: Integer;
 begin
+  Result := TInterlocked.Increment(NextSharedObjectLockOrder);
+end;
+
+function TDCProtector.Lock(AExecContext: TDCLocalExecContext; AReadOnly: Boolean): TDCProtected;
+var
+  AThread: TThread;
+begin
+  if (AExecContext = nil) then
+  begin
+    AThread := TThread.Current;
+    if (AThread is TDCThread)
+      then AExecContext := TDCThread(AThread).DCLocalExecContext;
+  end;
+  if (AExecContext = nil) then
+  begin
+    raise TDCNoLocalExecContextException.Create('No local execution context detected nor provided at lock command.');
+  end;
   if (FLockOrder < AExecContext.CurrentLockOrder) then
   begin
     raise TDCDeadLockException.Create('Possible deadLock detected. The global lock order is not respected.');
@@ -305,7 +328,19 @@ begin
 end;
 
 procedure TDCProtector.Unlock(AExecContext: TDCLocalExecContext);
+var
+  AThread: TThread;
 begin
+  if (AExecContext = nil) then
+  begin
+    AThread := TThread.Current;
+    if (AThread is TDCThread)
+      then AExecContext := TDCThread(AThread).DCLocalExecContext;
+  end;
+  if (AExecContext = nil) then
+  begin
+    raise TDCNoLocalExecContextException.Create('No local execution context detected nor provided at unlock command.');
+  end;
   if (FLockOrder <> AExecContext.CurrentLockOrder) then
   begin
     raise TDCBadUnlockSequenceException.Create('Bad unlock sequence. The local unlock order must be the reverse of the local lock order');
@@ -755,6 +790,26 @@ function TDCProtectedObjectQueue.Push(AObject: TObject): TObject;
 begin
   CheckReadWriteMode();
   Result := FObjectQueue.Push(AObject);
+end;
+
+{ TDCThread }
+
+constructor TDCThread.Create;
+begin
+  inherited Create;
+  FDCLocalExecContext := TDCLocalExecContext.Create;
+end;
+
+constructor TDCThread.Create(CreateSuspended: Boolean);
+begin
+  inherited Create(CreateSuspended);
+  FDCLocalExecContext := TDCLocalExecContext.Create;
+end;
+
+destructor TDCThread.Destroy;
+begin
+  FreeAndNil(FDCLocalExecContext);
+  inherited Destroy;
 end;
 
 end.

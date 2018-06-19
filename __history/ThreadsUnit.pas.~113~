@@ -1,0 +1,297 @@
+unit ThreadsUnit;
+
+interface
+
+uses
+  System.Classes, System.Types, System.SyncObjs, System.SysUtils, System.Contnrs, System.Generics.Collections,
+  DelphiConcurrent;
+
+{$define USE_EXPLICIT_CONTEXTS}
+
+type
+  TExchangedMessage = class
+    FID: Integer;
+    FDT: TDateTime;
+    constructor Create(const AID: Integer; const ADT: TDateTime);
+  public
+    procedure Assign(ASrcMsg: TExchangedMessage);
+    property ID: Integer read FID write FID;
+    property DT: TDateTime read FDT write FDT;
+  end;
+
+  TProducer = class(TDCThread)
+  private
+    FThreadNum, FMessagesNbr: Integer; // here FMessagesNbr = Nbr of messages to produce
+    FSharedResource: TDCProtector;
+  public
+    constructor Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCProtector);
+    procedure Execute; override;
+    procedure NotifyToUI(const msg: String);
+    property ThreadNum: Integer read FThreadNum write FThreadNum;
+  end;
+
+  TConsumer = class(TDCThread)
+  private
+    FThreadNum, FMessagesNbr: Integer; // here FMessagesNbr = Nbr of messages to consume
+    FSharedResource: TDCProtector;
+    FReceivedMessagesCopies: TObjectList<TExchangedMessage>;
+  public
+    constructor Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCProtector);
+    destructor Destroy; override;
+    procedure Execute; override;
+    procedure NotifyToUI(const msg: String);
+    property ThreadNum: Integer read FThreadNum write FThreadNum;
+  end;
+
+  TDeadLockTester = class(TDCThread)
+  private
+    FThreadNum: Char;
+    FSharedResources: array of TDCProtector;
+    FInstructions: TStringList;
+  public
+    constructor Create(const AThreadNum: Char; ASharedResources: array of TDCProtector; AInstructions: TStrings);
+    destructor Destroy; override;
+    procedure Execute; override;
+    procedure NotifyToUI(const msg: String);
+    property ThreadNum: Char read FThreadNum write FThreadNum;
+  end;
+
+implementation
+
+uses
+  MainUnit;
+
+{ TProducer }
+
+constructor TProducer.Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCProtector);
+begin
+  inherited Create();
+  FThreadNum := AThreadNum;
+  FMessagesNbr := AMessagesNbr;
+  FSharedResource := ASharedResource;
+end;
+
+procedure TProducer.Execute;
+var
+  i: Integer;
+  LExchangedMessage: TExchangedMessage;
+  LResourcePointer: TDCProtected;
+  LExecContext: TDCLocalExecContext;
+begin
+  inherited;
+  NameThreadForDebugging('Producer ' + FThreadNum.ToString);
+  NotifyToUI('Producer Thread ' + FThreadNum.ToString + ' Started');
+  {$ifdef USE_EXPLICIT_CONTEXTS}
+  LExecContext := TDCLocalExecContext.Create;
+  {$else}
+  LExecContext := nil;
+  {$endif}
+  try
+    i:=1;
+    while (i <= FMessagesNbr) and (not Terminated) do
+    begin
+      LExchangedMessage := TExchangedMessage.Create(i, Now());
+      LResourcePointer := FSharedResource.Lock(LExecContext, False); // ReadOnly: Boolean=True
+      try
+        if (LResourcePointer is TDCProtectedList) then
+        begin
+          TDCProtectedList(LResourcePointer).Add(LExchangedMessage);
+        end;
+      finally
+        FSharedResource.Unlock(LExecContext);
+      end;
+      Inc(i);
+      Sleep(5);
+    end;
+  finally
+    FreeAndNil(LExecContext);
+  end;
+  NotifyToUI('Producer Thread ' + FThreadNum.ToString + ' Terminated');
+end;
+
+procedure TProducer.NotifyToUI(const msg: String);
+begin
+  TThread.Queue(nil, procedure begin
+    MainForm.UpdateSpeedTestResult(msg);
+  end);
+end;
+
+{ TConsumer }
+
+constructor TConsumer.Create(const AThreadNum, AMessagesNbr: Integer; ASharedResource: TDCProtector);
+begin
+  inherited Create();
+  FThreadNum := AThreadNum;
+  FMessagesNbr := AMessagesNbr;
+  FSharedResource := ASharedResource;
+  FReceivedMessagesCopies := TObjectList<TExchangedMessage>.Create(True);
+end;
+
+destructor TConsumer.Destroy;
+begin
+  FreeAndNil(FReceivedMessagesCopies);
+  inherited;
+end;
+
+procedure TConsumer.Execute;
+var
+  i: Integer;
+  LResourcePointer: TDCProtected;
+  LExchangedMessageCopy: TExchangedMessage;
+  LExecContext: TDCLocalExecContext;
+begin
+  inherited;
+  NameThreadForDebugging('Consumer ' + FThreadNum.ToString);
+  NotifyToUI('Consumer Thread ' + FThreadNum.ToString + ' Started');
+  {$ifdef USE_EXPLICIT_CONTEXTS}
+  LExecContext := TDCLocalExecContext.Create;
+  {$else}
+  LExecContext := nil;
+  {$endif}
+  try
+    while (FReceivedMessagesCopies.Count < FMessagesNbr) and (not Terminated) do
+    begin
+      LResourcePointer := FSharedResource.Lock(LExecContext); // ReadOnly: Boolean=True
+      try
+        if (LResourcePointer is TDCProtectedList) then
+        begin
+          for i:=0 to TDCProtectedList(LResourcePointer).Count-1 do
+          begin
+            if (FReceivedMessagesCopies.IndexOf(TDCProtectedList(LResourcePointer)[i]) < 0) then
+            begin
+              LExchangedMessageCopy := TExchangedMessage.Create(0, 0);
+              LExchangedMessageCopy.Assign(TDCProtectedList(LResourcePointer)[i]);
+              FReceivedMessagesCopies.Add(LExchangedMessageCopy);
+            end;
+          end;
+        end;
+      finally
+        FSharedResource.Unlock(LExecContext);
+      end;
+      Sleep(5);
+    end;
+  finally
+    FreeAndNil(LExecContext);
+  end;
+  NotifyToUI('Consumer Thread ' + FThreadNum.ToString + ' Terminated');
+end;
+
+procedure TConsumer.NotifyToUI(const msg: String);
+begin
+  TThread.Queue(nil, procedure begin
+    MainForm.UpdateSpeedTestResult(msg);
+  end);
+end;
+
+{ TExchangedMessage }
+
+procedure TExchangedMessage.Assign(ASrcMsg: TExchangedMessage);
+begin
+  FID := ASrcMsg.ID;
+  FDT := ASrcMsg.DT;
+end;
+
+constructor TExchangedMessage.Create(const AID: Integer; const ADT: TDateTime);
+begin
+  FID := AID;
+  FDT := ADT;
+end;
+
+{ TDeadLockTester }
+
+constructor TDeadLockTester.Create(const AThreadNum: Char; ASharedResources: array of TDCProtector; AInstructions: TStrings);
+var
+  i: Integer;
+begin
+  inherited Create();
+  FThreadNum := AThreadNum;
+  // NOTE: SharedResource[0] is not used in this test (it's just for the speed test)
+  SetLength(FSharedResources, Length(ASharedResources) - 1);
+  for i:=1 to High(ASharedResources)
+    do FSharedResources[i-1] := ASharedResources[i];
+  FInstructions := TStringList.Create;
+  FInstructions.Assign(AInstructions);
+end;
+
+destructor TDeadLockTester.Destroy;
+begin
+  Finalize(FSharedResources);
+  FreeAndNil(FInstructions);
+  inherited;
+end;
+
+procedure TDeadLockTester.Execute;
+type
+  TInstructionType = (itLock, itUnLock);
+var
+  i, LResourceNum: Integer;
+  LInstructionType: TInstructionType;
+  LExecContext: TDCLocalExecContext;
+begin
+  inherited;
+  NameThreadForDebugging('DeadLockTester ' + FThreadNum);
+  NotifyToUI('DeadLockTester Thread ' + FThreadNum + ' Started');
+  {$ifdef USE_EXPLICIT_CONTEXTS}
+  LExecContext := TDCLocalExecContext.Create;
+  {$else}
+  LExecContext := nil;
+  {$endif}
+  try
+    try
+      for i:=0 to FInstructions.Count-1 do
+      begin
+        LResourceNum := Copy(FInstructions[i], Length('Resource') + 1, 1).ToInteger;
+        if (Copy(FInstructions[i], Pos('.', FInstructions[i]) + 1, Length(FInstructions[i])) = 'Lock')
+          then LInstructionType := itLock
+          else LInstructionType := itUnLock;
+        if (LInstructionType = itLock) then
+        begin
+          NotifyToUI('Thread ' + FThreadNum + ' Before Lock for Resource ' + LResourceNum.ToString);
+          FSharedResources[LResourceNum-1].Lock(LExecContext, False); // ReadOnly: Boolean=True
+          NotifyToUI('Thread ' + FThreadNum + ' After Lock for Resource ' + LResourceNum.ToString);
+        end else
+        begin
+          NotifyToUI('Thread ' + FThreadNum + ' Before UnLock for Resource ' + LResourceNum.ToString);
+          FSharedResources[LResourceNum-1].UnLock(LExecContext);
+          NotifyToUI('Thread ' + FThreadNum + ' After UnLock for Resource ' + LResourceNum.ToString);
+        end;
+      end;
+    except
+      on e1:Exception
+        do NotifyToUI('Exception "' + e1.ClassName + '" on Thread ' + FThreadNum + ' : ' + e1.message);
+    end;
+  finally
+    try
+      // First attempt to free the local execution context, will fail if any lock is missed active (by the programmer or a deadlock sequence)
+      LExecContext.Free; // BE CAREFULL: DONT USE FreeAndNil() HERE !
+    except
+      on e2:Exception do
+      begin
+        NotifyToUI('Exception "' + e2.ClassName + '" on Thread ' + FThreadNum + ' : ' + e2.message);
+        while (LExecContext.CurrentLockOrder > 0) do
+        begin
+          for i:=0 to High(FSharedResources) do
+          begin
+            if (FSharedResources[i].LockOrder = LExecContext.CurrentLockOrder) then
+            begin
+              FSharedResources[i].UnLock(LExecContext);
+              Break;
+            end;
+          end;
+        end;
+        // Now we can surely free the local execution context
+        FreeAndNil(LExecContext);
+      end;
+    end;
+  end;
+  NotifyToUI('DeadLockTester Thread ' + FThreadNum + ' Terminated');
+end;
+
+procedure TDeadLockTester.NotifyToUI(const msg: String);
+begin
+  TThread.Queue(nil, procedure begin
+    MainForm.UpdateDeadLockTestResult(msg);
+  end);
+end;
+
+end.

@@ -2,6 +2,8 @@ unit MainUnit;
 
 interface
 
+{$I DelphiConcurrentTest.inc}
+
 uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants, System.SyncObjs,
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Dialogs, FMX.Controls.Presentation,
@@ -71,6 +73,7 @@ type
     procedure Scenario_B_ListBoxChange(Sender: TObject);
   private
     { Déclarations privées }
+    MainExecContext : TDCLocalExecContext;
     SharedResourcesLst: array [0..3] of TDCProtector;
     ProducersLst: array of TProducer;
     ConsumersLst: array of TConsumer;
@@ -82,6 +85,8 @@ type
     procedure Thread_B_ActionsControl();
   public
     { Déclarations publiques }
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
     procedure UpdateSpeedTestResult(const msg: String);
     procedure UpdateDeadLockTestResult(const msg: String);
   end;
@@ -117,6 +122,14 @@ begin
   Thread_B_ActionsControl();
 end;
 
+constructor TMainForm.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  {$ifndef USE_EXPLICIT_CONTEXTS}
+  MainExecContext := TDCLocalExecContext.Create;
+  {$endif}
+end;
+
 procedure TMainForm.Del_Instruction_A_ButtonClick(Sender: TObject);
 var
   x : Integer;
@@ -145,6 +158,14 @@ begin
       else Scenario_B_ListBox.ItemIndex := x-1;
   end;
   Thread_B_ActionsControl();
+end;
+
+destructor TMainForm.Destroy;
+begin
+  {$ifndef USE_EXPLICIT_CONTEXTS}
+  FreeAndNil(MainExecContext);
+  {$endif}
+  inherited Destroy;
 end;
 
 procedure TMainForm.FormCreate(Sender: TObject);
@@ -238,7 +259,11 @@ begin
 
     for i:=1 to 3 do
     begin
+      {$ifdef USE_EXPLICIT_CONTEXTS}
       LExecContext := TDCLocalExecContext.Create;
+      {$else}
+      LExecContext := MainExecContext;
+      {$endif}
       LResourcePointer := SharedResourcesLst[i].Lock(LExecContext, False); // ReadOnly: Boolean=True
       try
         if (LResourcePointer is TDCProtectedList) then
@@ -250,7 +275,9 @@ begin
         end;
       finally
         SharedResourcesLst[i].Unlock(LExecContext);
+        {$ifdef USE_EXPLICIT_CONTEXTS}
         FreeAndNil(LExecContext);
+        {$endif}
       end;
       SharedResourcesLst[i].Free;
       SharedResourcesLst[i] := nil;
@@ -337,7 +364,11 @@ begin
   end;
   Finalize(ProducersLst);
   Finalize(ConsumersLst);
+  {$ifdef USE_EXPLICIT_CONTEXTS}
   LExecContext := TDCLocalExecContext.Create;
+  {$else}
+  LExecContext := MainExecContext;
+  {$endif}
   LResourcePointer := SharedResourcesLst[0].Lock(LExecContext, False); // ReadOnly: Boolean=True
   try
     if (LResourcePointer is TDCProtectedList) then
@@ -349,7 +380,9 @@ begin
     end;
   finally
     SharedResourcesLst[0].Unlock(LExecContext);
+    {$ifdef USE_EXPLICIT_CONTEXTS}
     FreeAndNil(LExecContext);
+    {$endif}
   end;
   SharedResourcesLst[0].Free;
   SharedResourcesLst[0] := nil;
