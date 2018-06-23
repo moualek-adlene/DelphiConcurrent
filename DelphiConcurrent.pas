@@ -9,12 +9,14 @@ unit DelphiConcurrent;
 interface
 
 uses
-  System.Classes, System.Types, System.SyncObjs, System.SysUtils, System.Contnrs,
-  System.Generics.Defaults, System.Generics.Collections;
+  System.Classes, System.Types, System.SyncObjs, System.SysUtils, System.StrUtils,
+  System.Contnrs, System.Generics.Defaults, System.Generics.Collections;
 
 type
+  TDCProtector = class;
   TDCProtected = class;
   TDCProtectedClass = class of TDCProtected;
+  TDCLocalExecContext = class;
   TDCException = class(Exception);
   TDCDeadLockException = class(TDCException);
   TDCRemainingLocksException = class(TDCException);
@@ -22,6 +24,7 @@ type
   TDCRWLockNeededException = class(TDCException);
   TDCNoLocalExecContextException = class(TDCException);
   TDCLockType = (ltMREW, ltCriticalSection, ltMonitor);
+  TDCExceptionDetailNotification = procedure(ADCLocalExecContext: TDCLocalExecContext; ADCProtector: TDCProtector; const AExceptionMsg: String) of object;
 
   // Delphi Concurrent Multi-Read Exclusive-Write Synchronizer Class
   TDCMultiReadExclusiveWriteSynchronizer = class(TMultiReadExclusiveWriteSynchronizer)
@@ -29,22 +32,29 @@ type
     FReadOnly: Boolean;
   public
     constructor Create();
-    procedure Lock(AReadOnly: Boolean); inline;
-    procedure Unlock; inline;
+    procedure Lock(AReadOnly: Boolean); {$IFNDEF DEBUG} inline; {$ENDIF}
+    procedure Unlock; {$IFNDEF DEBUG} inline; {$ENDIF}
     property ReadOnly: Boolean read FReadOnly;
   end;
 
   // Delphi Concurrent Local-Execution-Context Class (Anti-DeadLock System)
   TDCLocalExecContext = class
   private
-    FLockOrdersStack: TStack<Integer>;
-    function GetCurrentLockOrder(): Integer; inline;
+    FOwner: TObject;
+    FName: String;
+    FLocksStack: TStack<TDCProtector>;
+    FOnExceptionDetailNotification: TDCExceptionDetailNotification;
+    function GetCurrentLock(): TDCProtector; {$IFNDEF DEBUG} inline; {$ENDIF}
   public
-    constructor Create();
+    constructor Create(AOwner: TObject; const AName: String='');
     destructor Destroy; override;
-    procedure PushLockOrder(const ALockOrder: Integer); inline;
-    function PopLockOrder: Integer; inline;
-    property CurrentLockOrder: Integer read GetCurrentLockOrder;
+    procedure PushLock(ADCProtector: TDCProtector); {$IFNDEF DEBUG} inline; {$ENDIF}
+    function PopLock: TDCProtector; {$IFNDEF DEBUG} inline; {$ENDIF}
+    function ToString(): String; virtual;
+    property Owner: TObject read FOwner write FOwner;
+    property Name: String read FName write FName;
+    property CurrentLock: TDCProtector read GetCurrentLock;
+    property OnExceptionDetailNotification: TDCExceptionDetailNotification read FOnExceptionDetailNotification write FOnExceptionDetailNotification;
   end;
 
   // Delphi Thread with a Local Execution Context
@@ -71,8 +81,9 @@ type
     constructor Create(ADCProtectedClass: TDCProtectedClass; ALockType: TDCLockType=ltMREW);
     destructor Destroy; override;
     // Be optimist for Multi-Read, Use Read-Write Mode (Exclusif Access) only when necessary
-    function Lock(AExecContext: TDCLocalExecContext=nil; AReadOnly: Boolean=True): TDCProtected; //inline;
-    procedure Unlock(AExecContext: TDCLocalExecContext=nil); //inline;
+    function Lock(AExecContext: TDCLocalExecContext=nil; AReadOnly: Boolean=True): TDCProtected; {$IFNDEF DEBUG} inline; {$ENDIF}
+    procedure Unlock(AExecContext: TDCLocalExecContext=nil); {$IFNDEF DEBUG} inline; {$ENDIF}
+    function ToString(): String; virtual;
     property LockObject: TObject read FLockObject;
     property LockType: TDCLockType read FLockType;
     property LockOrder: Integer read FLockOrder;
@@ -81,10 +92,13 @@ type
   // Delphi Basic Protected-Object Class
   TDCProtected = class
   private
+    FName: String;
     FProtector: TDCProtector;
-    procedure CheckReadWriteMode(); inline;
+    procedure CheckReadWriteMode(); {$IFNDEF DEBUG} inline; {$ENDIF}
   public
-    constructor Create(AProtector: TDCProtector); virtual;
+    constructor Create(AProtector: TDCProtector; const AName: String=''); virtual;
+    function ToString(): String; virtual;
+    property Name: String read FName write FName;
     property Protector: TDCProtector read FProtector;
   end;
 
@@ -100,7 +114,7 @@ type
     procedure SetCapacity(NewCapacity: Integer);
     procedure SetCount(NewCount: Integer);
   public
-    constructor Create(AProtector: TDCProtector); override;
+    constructor Create(AProtector: TDCProtector; const AName: String=''); override;
     destructor Destroy; override;
     function Add(Item: Pointer): Integer;
     procedure Clear; virtual;
@@ -109,7 +123,7 @@ type
     function Expand: TList;
     function Extract(Item: Pointer): Pointer;
     function ExtractItem(Item: Pointer; Direction: TDirection): Pointer;
-    function First: Pointer; inline;
+    function First: Pointer; {$IFNDEF DEBUG} inline; {$ENDIF}
     function GetEnumerator: TListEnumerator;
     function IndexOf(Item: Pointer): Integer;
     function IndexOfItem(Item: Pointer; Direction: TDirection): Integer;
@@ -134,22 +148,22 @@ type
   protected
     function GetOwnsObjects(): Boolean;
     procedure SetOwnsObjects(Value: Boolean);
-    function GetItem(Index: Integer): TObject; inline;
+    function GetItem(Index: Integer): TObject; {$IFNDEF DEBUG} inline; {$ENDIF}
     procedure SetItem(Index: Integer; AObject: TObject);
   public
-    constructor Create(AProtector: TDCProtector; AOwnsObjects: Boolean); reintroduce;
+    constructor Create(AProtector: TDCProtector; AOwnsObjects: Boolean; const AName: String=''); reintroduce;
     destructor Destroy; override;
     function Add(AObject: TObject): Integer;
     function Extract(Item: TObject): TObject;
     function ExtractItem(Item: TObject; Direction: TList.TDirection): TObject;
     function Remove(AObject: TObject): Integer; overload;
     function RemoveItem(AObject: TObject; ADirection: TList.TDirection): Integer;
-    function IndexOf(AObject: TObject): Integer; inline;
-    function IndexOfItem(AObject: TObject; ADirection: TList.TDirection): Integer; inline;
+    function IndexOf(AObject: TObject): Integer; {$IFNDEF DEBUG} inline; {$ENDIF}
+    function IndexOfItem(AObject: TObject; ADirection: TList.TDirection): Integer; {$IFNDEF DEBUG} inline; {$ENDIF}
     function FindInstanceOf(AClass: TClass; AExact: Boolean = True; AStartAt: Integer = 0): Integer;
     procedure Insert(Index: Integer; AObject: TObject);
-    function First: TObject; inline;
-    function Last: TObject; inline;
+    function First: TObject; {$IFNDEF DEBUG} inline; {$ENDIF}
+    function Last: TObject; {$IFNDEF DEBUG} inline; {$ENDIF}
     property OwnsObjects: Boolean read GetOwnsObjects write SetOwnsObjects;
     property Items[Index: Integer]: TObject read GetItem write SetItem; default;
   end;
@@ -159,7 +173,7 @@ type
   private
     FStack: TStack;
   public
-    constructor Create(AProtector: TDCProtector); override;
+    constructor Create(AProtector: TDCProtector; const AName: String=''); override;
     destructor Destroy; override;
     function Count: Integer;
     function AtLeast(ACount: Integer): Boolean;
@@ -173,7 +187,7 @@ type
   private
     FObjectStack: TObjectStack;
   public
-    constructor Create(AProtector: TDCProtector); override;
+    constructor Create(AProtector: TDCProtector; const AName: String=''); override;
     destructor Destroy; override;
     function Count: Integer;
     function AtLeast(ACount: Integer): Boolean;
@@ -187,7 +201,7 @@ type
   private
     FQueue: TQueue;
   public
-    constructor Create(AProtector: TDCProtector); override;
+    constructor Create(AProtector: TDCProtector; const AName: String=''); override;
     destructor Destroy; override;
     function Count: Integer;
     function AtLeast(ACount: Integer): Boolean;
@@ -201,7 +215,7 @@ type
   private
     FObjectQueue: TObjectQueue;
   public
-    constructor Create(AProtector: TDCProtector); override;
+    constructor Create(AProtector: TDCProtector; const AName: String=''); override;
     destructor Destroy; override;
     function Count: Integer;
     function AtLeast(ACount: Integer): Boolean;
@@ -237,37 +251,70 @@ end;
 
 { TDCLocalExecContext }
 
-constructor TDCLocalExecContext.Create;
+constructor TDCLocalExecContext.Create(AOwner: TObject; const AName: String);
 begin
   inherited Create;
-  FLockOrdersStack := TStack<Integer>.Create;
+  FOwner := AOwner;
+  FName := AName;
+  FLocksStack := TStack<TDCProtector>.Create;
 end;
 
 destructor TDCLocalExecContext.Destroy;
+var
+  LLocksCount: Integer;
+  LDCProtector: TDCProtector;
+  LExceptionMsg: String;
 begin
-  if (FLockOrdersStack.Count > 0) then
+  LLocksCount := FLocksStack.Count;
+  if (LLocksCount > 0) then
   begin
-    raise TDCRemainingLocksException.Create(Format('The stack is not empty in the local execution context (%d remaining locks).', [FLockOrdersStack.Count]));
+    LExceptionMsg := Format('<DC Error>: The stack is not empty in the local execution context "%s" (%d remaining locks).',
+      [Self.ToString, LLocksCount]);
+    LDCProtector := CurrentLock;
+    while Assigned(LDCProtector) do
+    begin
+      if Assigned(OnExceptionDetailNotification)
+        then OnExceptionDetailNotification(Self, LDCProtector, LExceptionMsg);
+      LDCProtector.UnLock(Self);
+      LDCProtector := CurrentLock;
+    end;
   end;
-  FreeAndNil(FLockOrdersStack);
+  FreeAndNil(FLocksStack);
+  if (LLocksCount > 0) then
+  begin
+    raise TDCRemainingLocksException.Create(LExceptionMsg);
+  end;
   inherited Destroy;
 end;
 
-function TDCLocalExecContext.GetCurrentLockOrder: Integer;
+function TDCLocalExecContext.GetCurrentLock: TDCProtector;
 begin
-  if (FLockOrdersStack.Count > 0)
-    then Result := Integer(FLockOrdersStack.Peek)
-    else Result := 0;
+  if (FLocksStack.Count > 0)
+    then Result := FLocksStack.Peek()
+    else Result := nil;
 end;
 
-function TDCLocalExecContext.PopLockOrder: Integer;
+function TDCLocalExecContext.PopLock: TDCProtector;
 begin
-  Result := Integer(FLockOrdersStack.Pop);
+  Result := FLocksStack.Pop();
 end;
 
-procedure TDCLocalExecContext.PushLockOrder(const ALockOrder: Integer);
+procedure TDCLocalExecContext.PushLock(ADCProtector: TDCProtector);
 begin
-  FLockOrdersStack.Push(ALockOrder);
+  FLocksStack.Push(ADCProtector);
+end;
+
+function TDCLocalExecContext.ToString: String;
+begin
+  if Assigned(FOwner)
+    then Result := FOwner.QualifiedClassName
+    else Result := '';
+  if (FName <> '') then
+  begin
+    if (Result <> '')
+      then Result := Result + ' ';
+    Result := Result + '(' + FName + ')';
+  end;
 end;
 
 { TDCProtector }
@@ -302,50 +349,75 @@ end;
 
 function TDCProtector.Lock(AExecContext: TDCLocalExecContext; AReadOnly: Boolean): TDCProtected;
 var
-  AThread: TThread;
+  LThread: TThread;
+  LDCProtector: TDCProtector;
+  LDynExecContext: TDCLocalExecContext;
+  LExceptionMsg: String;
 begin
-  if (AExecContext = nil) then
+  LDynExecContext := AExecContext;
+  if not Assigned(LDynExecContext) then
   begin
-    AThread := TThread.Current;
-    if (AThread is TDCThread)
-      then AExecContext := TDCThread(AThread).DCLocalExecContext;
+    LThread := TThread.Current;
+    if (LThread is TDCThread)
+      then LDynExecContext := TDCThread(LThread).DCLocalExecContext;
   end;
-  if (AExecContext = nil) then
+  if not Assigned(LDynExecContext) then
   begin
-    raise TDCNoLocalExecContextException.Create('No local execution context detected nor provided at lock command.');
+    LExceptionMsg := '<DC Error>: No local execution context detected nor provided at lock command.';
+    raise TDCNoLocalExecContextException.Create(LExceptionMsg);
   end;
-  if (FLockOrder < AExecContext.CurrentLockOrder) then
+  LDCProtector := LDynExecContext.CurrentLock;
+  if Assigned(LDCProtector) and (LDCProtector.LockOrder > FLockOrder) then
   begin
-    raise TDCDeadLockException.Create('Possible deadLock detected. The global lock order is not respected.');
+    LExceptionMsg := Format('<DC Error>: Possible deadLock detected. The global lock order is not respected in the local execution context "%s".',
+      [LDynExecContext.ToString]);
+    if Assigned(LDynExecContext.OnExceptionDetailNotification)
+      then LDynExecContext.OnExceptionDetailNotification(LDynExecContext, Self, LExceptionMsg);
+    raise TDCDeadLockException.Create(LExceptionMsg);
   end;
   case FLockType of
     ltMREW: TDCMultiReadExclusiveWriteSynchronizer(FLockObject).Lock(AReadOnly);
     ltCriticalSection: TCriticalSection(FLockObject).Acquire;
     ltMonitor: TMonitor.Enter(FSharedObject);
   end;
-  AExecContext.PushLockOrder(FLockOrder);
+  LDynExecContext.PushLock(Self);
   Result := FSharedObject;
+end;
+
+function TDCProtector.ToString: String;
+begin
+  Result := Format('%s (LockOrder=%d)', [FSharedObject.ToString, FLockOrder]);
 end;
 
 procedure TDCProtector.Unlock(AExecContext: TDCLocalExecContext);
 var
-  AThread: TThread;
+  LThread: TThread;
+  LDCProtector: TDCProtector;
+  LDynExecContext: TDCLocalExecContext;
+  LExceptionMsg: String;
 begin
-  if (AExecContext = nil) then
+  LDynExecContext := AExecContext;
+  if not Assigned(LDynExecContext) then
   begin
-    AThread := TThread.Current;
-    if (AThread is TDCThread)
-      then AExecContext := TDCThread(AThread).DCLocalExecContext;
+    LThread := TThread.Current;
+    if (LThread is TDCThread)
+      then LDynExecContext := TDCThread(LThread).DCLocalExecContext;
   end;
-  if (AExecContext = nil) then
+  if not Assigned(LDynExecContext) then
   begin
-    raise TDCNoLocalExecContextException.Create('No local execution context detected nor provided at unlock command.');
+    LExceptionMsg := '<DC Error>: No local execution context detected nor provided at unlock command.';
+    raise TDCNoLocalExecContextException.Create(LExceptionMsg);
   end;
-  if (FLockOrder <> AExecContext.CurrentLockOrder) then
+  LDCProtector := LDynExecContext.CurrentLock;
+  if (LDCProtector <> Self) then
   begin
-    raise TDCBadUnlockSequenceException.Create('Bad unlock sequence. The local unlock order must be the reverse of the local lock order');
+    LExceptionMsg := Format('<DC Error>: Bad unlock sequence in the local execution context "%s". The local unlock order must be the reverse of the local lock order.',
+      [LDynExecContext.ToString]);
+    if Assigned(LDynExecContext.OnExceptionDetailNotification)
+      then LDynExecContext.OnExceptionDetailNotification(LDynExecContext, Self, LExceptionMsg);
+    raise TDCBadUnlockSequenceException.Create(LExceptionMsg);
   end;
-  AExecContext.PopLockOrder();
+  LDynExecContext.PopLock();
   case FLockType of
     ltMREW: TDCMultiReadExclusiveWriteSynchronizer(FLockObject).Unlock;
     ltCriticalSection: TCriticalSection(FLockObject).Release;
@@ -355,17 +427,32 @@ end;
 
 { TDCProtected }
 
-constructor TDCProtected.Create(AProtector: TDCProtector);
+constructor TDCProtected.Create(AProtector: TDCProtector; const AName: String);
 begin
   inherited Create;
+  FName := AName;
   FProtector := AProtector;
 end;
 
+function TDCProtected.ToString: String;
+begin
+  Result := Self.QualifiedClassName;
+  if (FName <> '') then
+  begin
+    if (Result <> '')
+      then Result := Result + ' ';
+    Result := Result + '(' + FName + ')';
+  end;
+end;
+
 procedure TDCProtected.CheckReadWriteMode();
+var
+  LExceptionMsg: String;
 begin
   if (FProtector.LockType = ltMREW) and (TDCMultiReadExclusiveWriteSynchronizer(FProtector.LockObject).ReadOnly) then
   begin
-    raise TDCRWLockNeededException.Create('Read/Write lock is needed for this operation.');
+    LExceptionMsg := '<DC Error>: Read/Write lock is needed for this operation.';
+    raise TDCRWLockNeededException.Create(LExceptionMsg);
   end;
 end;
 
@@ -389,9 +476,9 @@ begin
   FList.Clear;
 end;
 
-constructor TDCProtectedList.Create(AProtector: TDCProtector);
+constructor TDCProtectedList.Create(AProtector: TDCProtector; const AName: String);
 begin
-  inherited Create(AProtector);
+  inherited Create(AProtector, AName);
   FList := TList.Create;
 end;
 
@@ -539,9 +626,9 @@ begin
   Result := FObjectList.Add(AObject);
 end;
 
-constructor TDCProtectedObjectList.Create(AProtector: TDCProtector; AOwnsObjects: Boolean);
+constructor TDCProtectedObjectList.Create(AProtector: TDCProtector; AOwnsObjects: Boolean; const AName: String='');
 begin
-  inherited Create(AProtector);
+  inherited Create(AProtector, AName);
   FObjectList := TObjectList.Create(AOwnsObjects);
 end;
 
@@ -640,9 +727,9 @@ begin
   Result := FStack.Count;
 end;
 
-constructor TDCProtectedStack.Create(AProtector: TDCProtector);
+constructor TDCProtectedStack.Create(AProtector: TDCProtector; const AName: String);
 begin
-  inherited Create(AProtector);
+  inherited Create(AProtector, AName);
   FStack := TStack.Create;
 end;
 
@@ -681,9 +768,9 @@ begin
   Result := FObjectStack.Count;
 end;
 
-constructor TDCProtectedObjectStack.Create(AProtector: TDCProtector);
+constructor TDCProtectedObjectStack.Create(AProtector: TDCProtector; const AName: String);
 begin
-  inherited Create(AProtector);
+  inherited Create(AProtector, AName);
   FObjectStack := TObjectStack.Create;
 end;
 
@@ -722,9 +809,9 @@ begin
   Result := FQueue.Count;
 end;
 
-constructor TDCProtectedQueue.Create(AProtector: TDCProtector);
+constructor TDCProtectedQueue.Create(AProtector: TDCProtector; const AName: String);
 begin
-  inherited Create(AProtector);
+  inherited Create(AProtector, AName);
   FQueue := TQueue.Create;
 end;
 
@@ -763,9 +850,9 @@ begin
   Result := FObjectQueue.Count;
 end;
 
-constructor TDCProtectedObjectQueue.Create(AProtector: TDCProtector);
+constructor TDCProtectedObjectQueue.Create(AProtector: TDCProtector; const AName: String);
 begin
-  inherited Create(AProtector);
+  inherited Create(AProtector, AName);
   FObjectQueue := TObjectQueue.Create;
 end;
 
@@ -797,13 +884,13 @@ end;
 constructor TDCThread.Create;
 begin
   inherited Create;
-  FDCLocalExecContext := TDCLocalExecContext.Create;
+  FDCLocalExecContext := TDCLocalExecContext.Create(Self);
 end;
 
 constructor TDCThread.Create(CreateSuspended: Boolean);
 begin
   inherited Create(CreateSuspended);
-  FDCLocalExecContext := TDCLocalExecContext.Create;
+  FDCLocalExecContext := TDCLocalExecContext.Create(Self);
 end;
 
 destructor TDCThread.Destroy;

@@ -82,7 +82,7 @@ begin
   NameThreadForDebugging('Producer ' + FThreadNum.ToString);
   NotifyToUI('Producer Thread ' + FThreadNum.ToString + ' Started');
   {$ifdef USE_EXPLICIT_CONTEXTS}
-  LExecContext := TDCLocalExecContext.Create;
+  LExecContext := TDCLocalExecContext.Create(Self);
   {$else}
   LExecContext := nil;
   {$endif}
@@ -144,7 +144,7 @@ begin
   NameThreadForDebugging('Consumer ' + FThreadNum.ToString);
   NotifyToUI('Consumer Thread ' + FThreadNum.ToString + ' Started');
   {$ifdef USE_EXPLICIT_CONTEXTS}
-  LExecContext := TDCLocalExecContext.Create;
+  LExecContext := TDCLocalExecContext.Create(Self);
   {$else}
   LExecContext := nil;
   {$endif}
@@ -232,7 +232,7 @@ begin
   NameThreadForDebugging('DeadLockTester ' + FThreadNum);
   NotifyToUI('DeadLockTester Thread ' + FThreadNum + ' Started');
   {$ifdef USE_EXPLICIT_CONTEXTS}
-  LExecContext := TDCLocalExecContext.Create;
+  LExecContext := TDCLocalExecContext.Create(Self);
   {$else}
   LExecContext := nil;
   {$endif}
@@ -261,28 +261,12 @@ begin
         do NotifyToUI('Exception "' + e1.ClassName + '" on Thread ' + FThreadNum + ' : ' + e1.message);
     end;
   finally
-    if (LExecContext <> nil) then
     try
-      // First attempt to free the local execution context, will fail if any lock is missed active (by the programmer or a deadlock sequence)
-      LExecContext.Free; // BE CAREFULL: DONT USE FreeAndNil() HERE !
+      // Attempt to free the local execution context, will fail if any lock is missed active (by the programmer or a deadlock sequence)
+      FreeAndNil(LExecContext);
     except
-      on e2:Exception do
-      begin
-        NotifyToUI('Exception "' + e2.ClassName + '" on Thread ' + FThreadNum + ' : ' + e2.message);
-        while (LExecContext.CurrentLockOrder > 0) do
-        begin
-          for i:=0 to High(FSharedResources) do
-          begin
-            if (FSharedResources[i].LockOrder = LExecContext.CurrentLockOrder) then
-            begin
-              FSharedResources[i].UnLock(LExecContext);
-              Break;
-            end;
-          end;
-        end;
-        // Now we can surely free the local execution context
-        FreeAndNil(LExecContext);
-      end;
+      on e2:Exception
+        do NotifyToUI('Exception "' + e2.ClassName + '" on Thread ' + FThreadNum + ' : ' + e2.message);
     end;
   end;
   NotifyToUI('DeadLockTester Thread ' + FThreadNum + ' Terminated');

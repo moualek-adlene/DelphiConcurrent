@@ -126,7 +126,7 @@ constructor TMainForm.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   {$ifndef USE_EXPLICIT_CONTEXTS}
-  MainExecContext := TDCLocalExecContext.Create;
+  MainExecContext := TDCLocalExecContext.Create(Self);
   {$endif}
 end;
 
@@ -250,17 +250,27 @@ begin
     DeadLock_Test_Thread_B := TDeadLockTester.Create('B', SharedResourcesLst, Scenario_B_ListBox.Items);
     //
     DeadLock_Test_Thread_A.WaitFor;
-    DeadLock_Test_Thread_A.Free;
+    try
+      DeadLock_Test_Thread_A.Free;
+    except
+      on e:Exception
+        do UpdateDeadLockTestResult('Exception "' + e.ClassName + '" on Thread ' + DeadLock_Test_Thread_A.ThreadNum + ' : ' + e.message);
+    end;
     DeadLock_Test_Thread_A := nil;
 
     DeadLock_Test_Thread_B.WaitFor;
-    DeadLock_Test_Thread_B.Free;
+    try
+      DeadLock_Test_Thread_B.Free;
+    except
+      on e:Exception
+        do UpdateDeadLockTestResult('Exception "' + e.ClassName + '" on Thread ' + DeadLock_Test_Thread_B.ThreadNum + ' : ' + e.message);
+    end;
     DeadLock_Test_Thread_B := nil;
 
     for i:=1 to 3 do
     begin
       {$ifdef USE_EXPLICIT_CONTEXTS}
-      LExecContext := TDCLocalExecContext.Create;
+      LExecContext := TDCLocalExecContext.Create(Self);
       {$else}
       LExecContext := MainExecContext;
       {$endif}
@@ -270,7 +280,7 @@ begin
         begin
           for j:=0 to TDCProtectedList(LResourcePointer).Count-1 do
           begin
-             TExchangedMessage(TDCProtectedList(LResourcePointer)[j]).Free;
+            TExchangedMessage(TDCProtectedList(LResourcePointer)[j]).Free;
           end;
         end;
       finally
@@ -365,7 +375,7 @@ begin
   Finalize(ProducersLst);
   Finalize(ConsumersLst);
   {$ifdef USE_EXPLICIT_CONTEXTS}
-  LExecContext := TDCLocalExecContext.Create;
+  LExecContext := TDCLocalExecContext.Create(Self);
   {$else}
   LExecContext := MainExecContext;
   {$endif}
